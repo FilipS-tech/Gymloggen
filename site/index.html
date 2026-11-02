@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gymloggen">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Gymloggen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<style>
+[hidden]{display:none!important}
+img{max-width:100%}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* Layout: one-column phone app, sticky header, fixed bottom tab bar. Gymgolv: concrete dark, chalk white, one volt green, hard edges */
+:root{
+  --bg:#121212; --surface:#1A1A1A; --well:#0B0B0B; --ink:#F1F0EA; --muted:#8E8D86; --line:#2D2D2B; --line-hi:#4A4A46;
+  --accent:#C6FF00; --accent-ink:#0B0B0B; --soft:#1E2410; --danger:#FF5B4D; --ok:#C6FF00; --cell:#262624; --on:#C6FF00;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:2px; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:12px 10px}
+h1{font-family:var(--display);font-weight:700;font-size:30px;letter-spacing:.01em;line-height:1;margin:0;text-wrap:balance}
+.sync{font-size:12px;color:var(--muted);text-align:right}
+main{padding-block:16px 48px;display:flex;flex-direction:column;gap:18px}
+h2{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.section{display:flex;flex-direction:column;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;border-radius:10px;font-weight:600;border:1px solid var(--line);background:var(--surface)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--danger);border-color:var(--line)}
+.btn.wide{width:100%}
+.btn.sm{min-height:36px;padding:0 12px;font-size:14px}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+.btnrow .btn{flex:1 1 auto}
+.empty{text-align:center;padding:28px 16px;display:flex;flex-direction:column;gap:12px;align-items:center}
+.empty p{margin:0;max-width:34ch}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--accent);white-space:nowrap}
+.chip.lock{background:transparent;border:1px solid var(--line);color:var(--muted)}
+/* program cards */
+.prog{display:flex;flex-direction:column;gap:10px}
+.prog-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.prog-name{font-family:var(--display);font-weight:700;font-size:24px;line-height:1.1}
+.prog-ex{display:flex;flex-wrap:wrap;gap:6px}
+.prog-ex span{font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+/* exercise rows in a workout */
+.rows{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 12px;padding:14px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.fig{width:44px;height:44px;border-radius:10px;background:var(--soft);color:var(--accent);display:grid;place-items:center;grid-row:span 2}
+.fig svg{width:30px;height:30px}
+.row .name{font-weight:600;font-size:17px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.row .prev{font-size:14px;color:var(--muted)}
+.row .prev b{color:var(--ink);font-weight:600}
+.inputs{grid-column:2;display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:2px;flex:1 1 0;min-width:0}
+.field.box{flex:0 0 auto}
+.field.box input{width:68px;text-align:center;padding:0 6px}
+.lockbtn{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted)}
+.lockbtn svg{width:20px;height:20px}
+.lockbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ex-mini{display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;border-top:1px solid var(--line);text-align:left}
+.ex-mini:first-child{border-top:0}
+.ex-mini .fig{grid-row:auto;flex:0 0 36px;width:36px;height:36px}
+.ex-mini .fig svg{width:24px;height:24px}
+.ex-mini .nm{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex-mini .sum{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.ex-mini .sum svg{width:15px;height:15px}
+.ex-mini:hover{background:var(--soft)}
+.field label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+input[type=text],input[type=number],input[inputmode],select{width:100%;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:18px;padding:0 10px;font-variant-numeric:tabular-nums}
+select{font-size:16px}
+input::placeholder{color:var(--muted);opacity:.7}
+.fixed{grid-column:2;margin-top:6px;font-size:15px}
+.fixed b{font-weight:600}
+/* editor */
+.ex-edit{display:flex;flex-direction:column;gap:10px;padding:14px;border-top:1px solid var(--line)}
+.ex-edit:first-child{border-top:0}
+.ex-head{display:flex;gap:10px;align-items:center}
+.ex-head .fig{grid-row:auto;flex:0 0 44px}
+.ex-head input{flex:1}
+.iconbtns{display:flex;gap:2px}
+.iconbtn{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.iconbtn:hover{background:var(--soft);color:var(--ink)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{min-height:40px;font-weight:600;font-size:14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+/* history */
+.yg{display:grid;grid-auto-flow:column;grid-template-rows:repeat(14,auto);grid-auto-columns:1fr;gap:3px}
+.yg i{display:block;aspect-ratio:1;border-radius:2px;background:var(--cell)}
+.yg i.on{background:var(--on)}
+.yg i.today{outline:1.5px solid var(--ink);outline-offset:1px}
+.yhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.yhead .y{font-family:var(--display);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--cell);margin-right:5px;vertical-align:-1px}
+.legend i.on{background:var(--on)}
+@media (min-width:560px){
+  .yg{grid-template-rows:repeat(7,auto);gap:3px}
+  .row{grid-template-columns:44px minmax(0,1fr) auto;align-items:center}
+  .row .inputs,.row .fixed{grid-column:3;grid-row:1 / span 2;margin-top:0;flex-wrap:nowrap}
+}
+.sess{display:flex;flex-direction:column;gap:8px}
+.sess-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sess-date{font-family:var(--display);font-weight:700;font-size:20px}
+.sess ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.sess li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px dashed var(--line);font-size:15px}
+.sess li span:last-child{font-variant-numeric:tabular-nums;text-align:right}
+.banner{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--soft);border-radius:var(--r);padding:10px 14px;font-size:14px}
+/* progression */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px}
+.stat .k{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-family:var(--display);font-weight:700;font-size:24px;font-variant-numeric:tabular-nums;line-height:1.1}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--body);font-size:12px}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .ln{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.chart .ar{fill:var(--accent);opacity:.12}
+.chart .dt{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.chart .end{fill:var(--accent)}
+.chart .endlbl{fill:var(--ink);font-weight:600;font-size:13px}
+/* tabs */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav.tabs .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav.tabs button{min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:600;color:var(--muted)}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-current="page"]{color:var(--accent)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.btn,.seg button,nav.tabs button{transition:background-color .15s,color .15s}}
+
+/* ---- Gymgolv skin ---- */
+body{background:var(--bg) repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.012) 3px 4px)}
+header.top{border-bottom:2px solid var(--ink)}
+.titlebtn{font:inherit;color:inherit;padding:0;text-align:left}
+h1{font-weight:800;font-size:34px;text-transform:uppercase;letter-spacing:.02em}
+h1 .dot{color:var(--accent)}
+h2{font-weight:700;letter-spacing:.14em;color:var(--muted)}
+h2::before{content:"";display:inline-block;width:10px;height:10px;background:var(--accent);margin-right:8px;vertical-align:0}
+.card,.rows{border-radius:var(--r);border:1px solid var(--line)}
+.btn{border-radius:var(--r);font-family:var(--display);font-weight:700;font-size:18px;text-transform:uppercase;letter-spacing:.05em;border:2px solid var(--line-hi);background:transparent}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:active{transform:translateY(1px)}
+.btn.danger{color:var(--danger);border-color:var(--line-hi)}
+.chip{border-radius:var(--r);background:var(--accent);color:var(--accent-ink);text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+.chip.lock{background:transparent;border:1px solid var(--line-hi);color:var(--muted)}
+.prog-name{font-weight:800;font-size:28px;text-transform:uppercase;letter-spacing:.02em}
+.prog-ex span{border-radius:var(--r)}
+.fig,.ex-mini .fig{border-radius:var(--r);background:var(--well);border:1px solid var(--line-hi);color:var(--ink)}
+.row .name,.ex-mini .nm{font-family:var(--display);font-weight:700;font-size:21px;text-transform:uppercase;letter-spacing:.02em}
+.ex-mini .nm{font-size:19px}
+.row .prev b{color:var(--accent)}
+input[type=text],input[type=number],input[inputmode],select{border-radius:var(--r);background:var(--well);border:1px solid var(--line-hi)}
+.field.box input{font-family:var(--display);font-weight:700;font-size:22px}
+.field.box input:focus{border-color:var(--accent)}
+.lockbtn{border-radius:var(--r);border-color:var(--line-hi)}
+.lockbtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.iconbtn{border-radius:var(--r)}
+.ex-mini:hover{background:var(--well)}
+.sess-date{font-weight:800;text-transform:uppercase;letter-spacing:.02em}
+.sess li{border-top:1px solid var(--line)}
+.sess li span:last-child{font-family:var(--display);font-weight:700;font-size:18px}
+.banner{border-radius:var(--r);border:1px solid var(--accent);background:var(--soft)}
+.stat{border-radius:var(--r)}
+.stat .v{font-weight:800;font-size:28px}
+.stat:first-child .v{color:var(--accent)}
+.yg i{border-radius:0}
+.yhead .y{font-weight:800}
+nav.tabs{background:var(--well);border-top:2px solid var(--ink)}
+nav.tabs button{font-family:var(--display);font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+nav.tabs button{position:relative}
+nav.tabs button[aria-current="page"]{color:var(--accent)}
+nav.tabs button[aria-current="page"]::before{content:"";position:absolute;left:0;right:0;top:-2px;height:4px;background:var(--accent)}
+.toast{border-radius:var(--r);background:var(--accent);color:var(--accent-ink);font-family:var(--display);text-transform:uppercase;letter-spacing:.05em;font-size:16px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline-color:var(--accent)}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.days button{min-height:44px;border:1px solid var(--line-hi);border-radius:var(--r);font-family:var(--display);font-weight:700;font-size:16px;text-transform:uppercase;color:var(--muted);background:var(--well)}
+.days button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.prog.rec{border:2px solid var(--accent)}
+/* hamburger menu */
+.burger{width:44px;height:44px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;border:2px solid var(--line-hi);border-radius:var(--r);flex:0 0 44px}
+.burger span{display:block;width:20px;height:2px;background:var(--ink)}
+.burger[aria-expanded="true"]{border-color:var(--accent)}
+.burger[aria-expanded="true"] span{background:var(--accent)}
+.menu{position:absolute;left:0;right:0;top:100%;background:var(--well);border-bottom:2px solid var(--ink);box-shadow:0 18px 30px rgba(0,0,0,.6)}
+.menu .wrap{padding-block:6px 12px;display:flex;flex-direction:column;gap:8px}
+.menu-in{display:flex;flex-direction:column}
+.menu-in button{display:flex;align-items:center;gap:14px;min-height:54px;padding:0 4px;border-bottom:1px solid var(--line);font-family:var(--display);font-weight:700;font-size:22px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink);text-align:left}
+.menu-in button svg{width:22px;height:22px;color:var(--muted)}
+.menu-in button[aria-current="page"]{color:var(--accent);box-shadow:inset 4px 0 0 var(--accent);padding-left:14px}
+.menu-in button[aria-current="page"] svg{color:var(--accent)}
+.menu .sync{text-align:left}
+/* v2: auth, onboarding, coach */
+.account{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:4px}
+.account .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.screen{display:flex;flex-direction:column;gap:14px;padding-top:8px}
+.lead{font-family:var(--display);font-weight:800;font-size:30px;line-height:1.05;text-transform:uppercase;margin:0;text-wrap:balance}
+.lead em{font-style:normal;color:var(--accent)}
+.screen p{margin:0}
+.form{display:flex;flex-direction:column;gap:12px}
+.form textarea{width:100%;min-height:96px;border:1px solid var(--line-hi);border-radius:var(--r);background:var(--well);color:var(--ink);font:inherit;font-size:16px;padding:10px;resize:vertical}
+.form textarea:focus,.form input:focus{border-color:var(--accent);outline:none}
+.form input[type=email],.form input[type=password]{width:100%;min-height:48px;border:1px solid var(--line-hi);border-radius:var(--r);background:var(--well);color:var(--ink);font:inherit;font-size:17px;padding:0 12px}
+.google{display:flex;gap:10px;align-items:center;justify-content:center;background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.google svg{width:20px;height:20px}
+.divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.12em}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line-hi)}
+.linkbtn{color:var(--muted);text-decoration:underline;text-underline-offset:3px;font-size:14px;align-self:flex-start;padding:4px 0}
+.msg{border:1px solid var(--line-hi);border-left:3px solid var(--accent);padding:10px 12px;font-size:15px}
+.msg.err{border-left-color:var(--danger)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{min-height:44px;min-width:48px;padding:0 14px;border:1px solid var(--line-hi);border-radius:var(--r);background:var(--well);font-family:var(--display);font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.flabel{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.opt{text-transform:none;letter-spacing:0;font-weight:400}
+.loadbar{height:4px;background:var(--line);overflow:hidden;position:relative}
+.loadbar::after{content:"";position:absolute;inset:0 auto 0 0;width:35%;background:var(--accent)}
+@media (prefers-reduced-motion:no-preference){.loadbar::after{animation:lb 1.3s ease-in-out infinite}@keyframes lb{0%{left:-35%}100%{left:100%}}}
+.sugg{display:flex;flex-direction:column;gap:8px}
+.sugg ul{list-style:none;margin:0;padding:0}
+.sugg li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--line);font-size:15px}
+.sugg li span:last-child{font-family:var(--display);font-weight:700;font-size:17px;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.sugg li svg{width:14px;height:14px}
+.summary{font-size:16px;line-height:1.5}
+/* leave dialog */
+.modal{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:640px;background:var(--surface);border-top:3px solid var(--accent);padding:20px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px}
+.sheet h3{font-family:var(--display);font-weight:800;font-size:26px;text-transform:uppercase;margin:0;line-height:1.1}
+.sheet p{margin:0 0 6px;color:var(--muted)}
+@media (min-width:560px){.modal{align-items:center}.sheet{border:2px solid var(--line-hi);border-top:3px solid var(--accent)}}
+</style>
+</head>
+<body>
+
+<header class="top"><div class="wrap"><h1><button class="titlebtn" id="title" data-act="title" aria-label="Till startsidan för fliken">Träna</button></h1>
+<button class="burger" id="burger" data-act="menu" aria-expanded="false" aria-controls="menu" aria-label="Meny"><span></span><span></span><span></span></button></div>
+<nav class="menu" id="menu" aria-label="Huvudmeny" hidden><div class="wrap"><div class="menu-in" id="tabs"></div><div class="sync" id="sync">Laddar…</div><div class="account" id="account"></div></div></nav></header>
+<main id="main" class="wrap"></main>
+<div class="toast" id="toast" hidden></div>
+<div class="modal" id="modal" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+"use strict";
+/* ---------- small helpers ---------- */
+const $ = s => document.querySelector(s);
+const main = $("#main");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-5);
+const num = v => { if (v === "" || v == null) return null; const n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : null; };
+const fmtNum = n => (Math.round(n * 100) / 100).toString().replace(".", ",");
+const dShort = iso => new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
+const dLong = iso => new Date(iso).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
+const clone = o => JSON.parse(JSON.stringify(o));
+
+/* ---------- figures ---------- */
+const S = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const ICONS = {
+  press: S('<circle cx="4.5" cy="13.5" r="1.8"/><path d="M6.5 14h8l3 4v3"/><path d="M9 14V8M12 14V8"/><path d="M5 7.5h12"/><path d="M4.5 6v3M17.5 6v3"/><path d="M5 17h11M7 17v4M14 17v4"/>'),
+  squat: S('<circle cx="12" cy="3.8" r="1.8"/><path d="M5 7h14M6 5.5v3M18 5.5v3"/><path d="M12 6l-2 7 5 1-2 6"/><path d="M10 13l-1 7"/><path d="M5 21h14"/>'),
+  hinge: S('<circle cx="17.5" cy="6.5" r="1.8"/><path d="M15.5 8.5L8 11l1 5-1 5"/><path d="M14 9.5V17"/><path d="M8 18h12"/><circle cx="9" cy="18" r="2.2"/><circle cx="19" cy="18" r="2.2"/>'),
+  pull: S('<circle cx="17.5" cy="6.5" r="1.8"/><path d="M15.5 8.5L8 11l1 5-1 5"/><path d="M14 9.5l-1 4.5"/><path d="M8 14h11"/><path d="M9 12.5v3M18 12.5v3"/>'),
+  push: S('<circle cx="4.5" cy="10" r="1.8"/><path d="M6.5 11l13 5"/><path d="M8 11.6V17"/><path d="M2.5 17.5h19"/>'),
+  run: S('<circle cx="14" cy="3.8" r="1.8"/><path d="M13 6.5l-2 6"/><path d="M12.3 8.5l3.7 2M12.3 8.5L8.5 10"/><path d="M11 12.5l3 3-1 3.5M11 12.5L8 15H5"/><path d="M3 21.5h18"/>'),
+  gen: S('<path d="M7 12h10"/><rect x="3.5" y="8.5" width="3.5" height="7" rx="1"/><rect x="17" y="8.5" width="3.5" height="7" rx="1"/><path d="M2 12h1.5M20.5 12H22"/>')
+};
+const ICON_NAMES = { press: "Bänk/press", squat: "Knäböj", hinge: "Marklyft", pull: "Rodd/drag", push: "Armhävning", run: "Kondition", gen: "Övrigt" };
+const TYPES = { kg: "Kilo", time: "Tid (min)", bw: "Kroppsvikt" };
+const TAB_ICONS = {
+  trana: S('<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>'),
+  program: S('<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>'),
+  historik: S('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  progression: S('<path d="M3.5 20.5h17"/><path d="M5 16l5-5 3.5 3L20 7.5"/><path d="M15.5 7.5H20V12"/>')
+};
+const TABS = [["trana", "Träna"], ["program", "Program"], ["historik", "Historik"], ["progression", "Progression"]];
+
+/* ---------- formatting a logged exercise ---------- */
+function fmtEntry(e) {
+  const parts = [];
+  if (e.type === "kg" && e.value != null) parts.push(fmtNum(e.value) + " kg");
+  if (e.type === "time" && e.value != null) parts.push(fmtNum(e.value) + " min");
+  const reps = e.reps || 1, sets = e.sets || 1;
+  let rs = "";
+  if (reps > 1 && sets > 1) rs = sets + "×" + reps;
+  else if (reps > 1) rs = reps + " reps";
+  else if (sets > 1) rs = sets + " set";
+  if (e.type === "bw") parts.push(rs ? rs + " (kroppsvikt)" : "Kroppsvikt");
+  else if (rs) parts.push(rs);
+  return parts.join(" · ") || "–";
+}
+const LOCK = S('<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>');
+const UNLOCK = S('<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.6-1.8"/>');
+function planText(x) {
+  const e = { type: x.type, value: num(x.value), reps: num(x.reps) || 1, sets: num(x.sets) || 1 };
+  if (e.type === "time") e.reps = 1;
+  const t = fmtEntry(e);
+  return t === "–" ? TYPES[x.type] : t;
+}
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const DAY_SHORT = ["Sö", "Må", "Ti", "On", "To", "Fr", "Lö"];
+const DAY_LONG = ["söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag"];
+const daysText = p => (p.days || []).length === 7 ? "Varje dag" : DAY_ORDER.filter(d => (p.days || []).includes(d)).map(d => DAY_SHORT[d]).join(" · ");
+const metric = e => e.type === "bw" ? (e.reps || 0) : (e.value || 0);
+const metricUnit = t => t === "kg" ? "kg" : t === "time" ? "min" : "reps";
+
+/* ---------- state ---------- */
+const SB_URL = "https://kxlshlhqrakmeejejcnk.supabase.co";
+const SB_KEY = "sb_publishable_VPdVfXoEUQirhFZAYwG7fw_YITRh5uJ";
+const state = {
+  view: "trana", programs: [], sessions: [], loaded: false,
+  active: null, editing: null, open: new Set(), confirm: null, progKey: null,
+  screen: "loading", user: null, authMode: "in", authMsg: null, busy: false, legacy: null,
+  coach: null
+};
+const draftKey = () => "gymloggen-draft-" + (state.user ? state.user.id : "x");
+const saveDraft = () => { try { state.active ? localStorage.setItem(draftKey(), JSON.stringify(state.active)) : localStorage.removeItem(draftKey()); } catch (_) {} };
+
+/* ---------- account + sync: Supabase with an offline outbox ---------- */
+const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "implicit" } }) : null;
+const sortS = a => a.slice().sort((x, y) => (y.date > x.date ? 1 : -1));
+const rowToSess = r => ({ id: r.id, date: r.date, programId: r.program_id, programName: r.program_name, entries: r.entries || [] });
+const isNetErr = e => !e || !e.code || /^PGRST3/.test(e.code) || /fetch|network|load failed|timed? ?out/i.test(e.message || "");
+const Store = {
+  uid: null, flushing: false, synced: false,
+  key(k) { return "gymloggen-" + k + "-" + this.uid; },
+  get(k, d) { try { const v = localStorage.getItem(this.key(k)); return v ? JSON.parse(v) : d; } catch (_) { return d; } },
+  set(k, v) { try { localStorage.setItem(this.key(k), JSON.stringify(v)); } catch (_) {} },
+  cache() { this.set("cache", { programs: state.programs, sessions: state.sessions }); },
+  outbox() { return this.get("outbox", []); },
+  push(ops) { const o = this.outbox().concat(ops); this.set("outbox", o); this.cache(); setSync(); this.flush(); },
+  async start(uid) {
+    this.uid = uid; this.synced = false;
+    const c = this.get("cache", null);
+    state.programs = c ? c.programs : []; state.sessions = c ? sortS(c.sessions) : []; state.loaded = !!c;
+    setSync(); await this.flush(); await this.pull();
+  },
+  async pull() {
+    try {
+      const [p, q] = await Promise.all([
+        sb.from("programs").select("id,data,position").order("position"),
+        sb.from("sessions").select("id,date,program_id,program_name,entries").order("date", { ascending: false }).limit(5000)
+      ]);
+      if (p.error || q.error) throw (p.error || q.error);
+      if (this.outbox().length) { state.loaded = true; return; }
+      state.programs = p.data.map(r => Object.assign({}, r.data, { id: r.id }));
+      state.sessions = q.data.map(rowToSess);
+      state.loaded = true; this.synced = true; this.cache();
+    } catch (e) { state.loaded = true; this.synced = false; }
+    setSync(); render();
+  },
+  async flush() {
+    if (this.flushing || !this.uid || !sb) return;
+    this.flushing = true;
+    try {
+      let o = this.outbox();
+      while (o.length) {
+        const ok = await this.run(o[0]);
+        if (!ok) break;
+        o = this.outbox(); o.shift(); this.set("outbox", o);
+      }
+      if (!o.length) this.synced = true;
+    } finally { this.flushing = false; setSync(); }
+  },
+  async run(op) {
+    try {
+      let r;
+      if (op.t === "pu") r = await sb.from("programs").upsert({ user_id: this.uid, id: op.id, data: op.data, position: op.pos, updated_at: new Date().toISOString() }, { onConflict: "user_id,id" });
+      else if (op.t === "pd") r = await sb.from("programs").delete().eq("id", op.id);
+      else if (op.t === "su") r = await sb.from("sessions").upsert(Object.assign({ user_id: this.uid }, op.row), { onConflict: "user_id,id" });
+      else if (op.t === "sd") r = await sb.from("sessions").delete().eq("id", op.id);
+      else return true;
+      if (r.error) { if (isNetErr(r.error)) return false; console.warn("sync", r.error); return true; }
+      return true;
+    } catch (_) { return false; }
+  },
+  savePrograms(list) {
+    const old = new Map(state.programs.map((p, i) => [p.id, JSON.stringify(p) + "|" + i]));
+    const ops = [];
+    const ids = new Set(list.map(p => p.id));
+    state.programs.forEach(p => { if (!ids.has(p.id)) ops.push({ t: "pd", id: p.id }); });
+    list.forEach((p, i) => { if (old.get(p.id) !== JSON.stringify(p) + "|" + i) { const { id, ...data } = clone(p); ops.push({ t: "pu", id, data, pos: i }); } });
+    state.programs = list;
+    if (ops.length) this.push(ops); else this.cache();
+    return Promise.resolve();
+  },
+  addSession(s) {
+    state.sessions = sortS(state.sessions.concat([s]));
+    this.push([{ t: "su", row: { id: s.id, date: s.date, program_id: s.programId || null, program_name: s.programName || null, entries: s.entries } }]);
+    return Promise.resolve();
+  },
+  deleteSession(id) {
+    state.sessions = state.sessions.filter(s => s.id !== id);
+    this.push([{ t: "sd", id }]);
+    return Promise.resolve();
+  }
+};
+window.addEventListener("online", () => { Store.flush().then(() => Store.pull()); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Store.uid && navigator.onLine) Store.flush(); });
+function setSync() {
+  const n = Store.uid ? Store.outbox().length : 0;
+  $("#sync").textContent = !Store.uid ? "" : n ? `Offline · ${n} ${n === 1 ? "ändring" : "ändringar"} synkas när du får nät` : Store.synced ? "Sparas i ditt konto" : navigator.onLine ? "Synkar…" : "Offline · visar sparad data";
+}
+
+/* ---------- login ---------- */
+const AUTH_ERR = [
+  [/invalid login credentials/i, "Fel e-post eller lösenord."],
+  [/email not confirmed/i, "Bekräfta din e-post först. Kolla inkorgen och klicka på länken."],
+  [/already registered|already exists/i, "Det finns redan ett konto med den e-posten. Logga in istället."],
+  [/password should be at least|weak password/i, "Lösenordet måste vara minst 6 tecken."],
+  [/provider is not enabled|unsupported provider/i, "Google-inloggning är inte aktiverad än."],
+  [/rate limit|too many/i, "För många försök just nu. Vänta en stund och försök igen."],
+  [/invalid email|unable to validate email/i, "Kontrollera e-postadressen."],
+  [/fetch|network/i, "Ingen kontakt med servern. Kolla din internetanslutning."]
+];
+const authErr = e => { const m = (e && e.message) || ""; for (const [re, t] of AUTH_ERR) if (re.test(m)) return t; return "Något gick fel. Försök igen."; };
+const redirectTo = () => location.origin + location.pathname;
+const Auth = {
+  async init() {
+    if (!sb) { state.screen = "nolib"; render(true); return; }
+    sb.auth.onAuthStateChange((ev, session) => {
+      if (ev === "PASSWORD_RECOVERY") { state.screen = "recover"; state.authMsg = null; setTimeout(() => render(true), 0); return; }
+      if (ev === "SIGNED_IN" && session && (state.screen === "auth" || state.screen === "loading") && !state.user) setTimeout(() => Auth.enter(session.user), 0);
+    });
+    let session = null;
+    try { const r = await sb.auth.getSession(); session = r.data && r.data.session; } catch (_) {}
+    if (state.screen === "recover") return;
+    if (session) return this.enter(session.user);
+    let last = null; try { last = JSON.parse(localStorage.getItem("gymloggen-lastuser")); } catch (_) {}
+    if (last && !navigator.onLine) return this.enter(last, true);
+    state.screen = "auth"; render(true);
+  },
+  async enter(user, offline) {
+    state.user = { id: user.id, email: user.email };
+    try { localStorage.setItem("gymloggen-lastuser", JSON.stringify(state.user)); } catch (_) {}
+    try { const d = localStorage.getItem(draftKey()); state.active = d ? JSON.parse(d) : null; } catch (_) { state.active = null; }
+    state.screen = "loading"; render(true);
+    await Store.start(user.id);
+    let onboarded = Store.get("onboarded", null);
+    if (onboarded === null && !offline) {
+      try { const { data } = await sb.from("profiles").select("onboarded").eq("id", user.id).maybeSingle(); onboarded = !!(data && data.onboarded); } catch (_) { onboarded = false; }
+      if (onboarded) Store.set("onboarded", true);
+    }
+    state.legacy = null;
+    try {
+      const v1 = JSON.parse(localStorage.getItem("gymloggen-data") || "null");
+      if (v1 && Store.synced && !state.programs.length && !state.sessions.length && ((v1.programs || []).length || (v1.sessions || []).length) && !localStorage.getItem("gymloggen-v1-handled")) state.legacy = v1;
+    } catch (_) {}
+    state.screen = state.legacy ? "import" : onboarded ? "app" : "onboard";
+    render(true);
+  },
+  async markOnboarded() {
+    Store.set("onboarded", true);
+    try { await sb.from("profiles").upsert({ id: state.user.id, onboarded: true }); } catch (_) {}
+  },
+  async logout() {
+    if (Store.outbox().length) { toast("Vänta tills allt är synkat innan du loggar ut."); Store.flush(); return; }
+    try { await sb.auth.signOut(); } catch (_) {}
+    try { localStorage.removeItem("gymloggen-lastuser"); } catch (_) {}
+    Object.assign(state, { user: null, programs: [], sessions: [], active: null, editing: null, menu: false, screen: "auth", authMode: "in", authMsg: null, view: "trana" });
+    Store.uid = null; render(true);
+  }
+};
+
+/* ---------- coach ---------- */
+const newCoach = from => ({ from, step: "form", answers: { goal: "", perWeek: 3, minutes: 60, days: [], experience: "Nybörjare", equipment: "Fullt gym", injuries: "", lifts: "" }, result: null, feedback: "", showFeedback: false, error: null, remaining: null });
+async function runCoach(withFeedback) {
+  const c = state.coach;
+  if (!c.answers.goal.trim()) { toast("Beskriv ditt mål först."); return; }
+  if (!navigator.onLine) { toast("Du behöver internet för att använda coachen."); return; }
+  const body = { answers: c.answers };
+  if (withFeedback) { if (!c.feedback.trim()) { toast("Skriv vad du vill ändra."); return; } body.previous = c.result; body.feedback = c.feedback; }
+  c.step = "loading"; c.error = null; render(true); window.scrollTo(0, 0);
+  try {
+    const { data, error } = await sb.functions.invoke("coach", { body });
+    if (error) {
+      let msg = "Coachen svarade inte. Försök igen om en stund.";
+      try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (_) {}
+      throw new Error(msg);
+    }
+    c.result = data; c.remaining = data.remaining; c.feedback = ""; c.showFeedback = false; c.step = "result";
+  } catch (e) { c.error = e.message || "Något gick fel."; c.step = c.result ? "result" : "form"; }
+  render(true); window.scrollTo(0, 0);
+}
+function saveCoach() {
+  const c = state.coach;
+  const add = c.result.programs.map(p => ({ id: uid(), name: p.name, days: p.days || [], exercises: p.exercises.map(x => Object.assign({ id: uid() }, x)) }));
+  Store.savePrograms(state.programs.concat(add));
+  Auth.markOnboarded();
+  state.coach = null; state.screen = "app"; state.view = "trana";
+  toast(add.length === 1 ? "1 pass sparat" : add.length + " pass sparade");
+  try { history.replaceState(null, "", "#trana"); } catch (_) {}
+  render(true); window.scrollTo(0, 0);
+}
+
+/* ---------- screens before the app ---------- */
+const GOOGLE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.5-.2-2.3H12v4.3h6a5.1 5.1 0 0 1-2.2 3.4v2.8h3.6c2.1-2 3.2-4.8 3.2-8.2z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.4-2.7l-3.6-2.8c-1 .7-2.3 1.1-3.8 1.1-2.9 0-5.4-2-6.3-4.6H2v2.9A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.7 14c-.2-.7-.4-1.3-.4-2s.2-1.4.4-2V7.1H2A11 11 0 0 0 1 12c0 1.8.4 3.5 1.2 4.9l3.5-2.9z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2 7.1l3.7 2.9c.9-2.6 3.4-4.6 6.3-4.6z"/></svg>';
+const msgBox = m => m ? `<div class="msg${m.err ? " err" : ""}" role="${m.err ? "alert" : "status"}">${esc(m.text)}</div>` : "";
+function vScreen() {
+  const sc = state.screen;
+  if (sc === "loading") return `<div class="screen"><div class="loadbar"></div><p class="muted">Hämtar dina pass…</p></div>`;
+  if (sc === "nolib") return `<div class="screen"><p class="lead">Ingen kontakt</p><p class="muted">Appen behöver internet första gången du loggar in. Anslut och ladda om sidan.</p><button class="btn primary" data-act="reload">Försök igen</button></div>`;
+  if (sc === "auth") {
+    const m = state.authMode, b = state.busy;
+    const head = m === "up" ? "Skapa <em>konto</em>" : m === "reset" ? "Nytt <em>lösenord</em>" : "Logga <em>in</em>";
+    return `<div class="screen">
+      <p class="lead">${head}</p>
+      <p class="muted">${m === "reset" ? "Skriv din e-post så skickar vi en länk där du väljer ett nytt lösenord." : "Dina program och pass sparas i ditt konto, så du kommer åt dem från vilken enhet som helst."}</p>
+      ${msgBox(state.authMsg)}
+      ${m !== "reset" ? `<button class="btn google wide" data-act="google"${b ? " disabled" : ""}>${GOOGLE}<span>Fortsätt med Google</span></button><div class="divider">eller med e-post</div>` : ""}
+      <form class="form" id="authform" novalidate>
+        <div class="field"><label for="au-email">E-post</label><input id="au-email" type="email" autocomplete="email" inputmode="email" required value="${esc(state.authEmail || "")}"></div>
+        ${m !== "reset" ? `<div class="field"><label for="au-pass">Lösenord${m === "up" ? ` <span class="opt">(minst 6 tecken)</span>` : ""}</label><input id="au-pass" type="password" autocomplete="${m === "up" ? "new-password" : "current-password"}" required></div>` : ""}
+        <button class="btn primary wide" type="submit"${b ? " disabled" : ""}>${b ? "Vänta…" : m === "up" ? "Skapa konto" : m === "reset" ? "Skicka länk" : "Logga in"}</button>
+      </form>
+      ${m === "in" ? `<button class="linkbtn" data-act="authMode" data-v="reset">Glömt lösenordet?</button>` : ""}
+      <div class="divider">${m === "up" ? "Har du redan ett konto?" : m === "reset" ? "Kom du ihåg det?" : "Ny här?"}</div>
+      <button class="btn wide" data-act="authMode" data-v="${m === "in" ? "up" : "in"}">${m === "in" ? "Skapa konto" : "Logga in"}</button>
+    </div>`;
+  }
+  if (sc === "recover") return `<div class="screen"><p class="lead">Välj nytt <em>lösenord</em></p>${msgBox(state.authMsg)}
+      <form class="form" id="recoverform" novalidate><div class="field"><label for="au-new">Nytt lösenord <span class="opt">(minst 6 tecken)</span></label><input id="au-new" type="password" autocomplete="new-password" required></div>
+      <button class="btn primary wide" type="submit"${state.busy ? " disabled" : ""}>Spara lösenordet</button></form></div>`;
+  if (sc === "import") {
+    const L = state.legacy;
+    return `<div class="screen"><p class="lead">Flytta din <em>data</em>?</p>
+      <p>Vi hittade <b>${(L.programs || []).length} program</b> och <b>${(L.sessions || []).length} pass</b> sparade i den här telefonen från den tidigare versionen av appen.</p>
+      <p class="muted">Flyttar du dem hamnar de i ditt konto och syns på alla dina enheter.</p>
+      <button class="btn primary wide" data-act="importLegacy">Flytta till mitt konto</button>
+      <button class="btn wide" data-act="skipLegacy">Börja från noll</button></div>`;
+  }
+  if (sc === "onboard") return `<div class="screen"><p class="lead">Vill du ha hjälp att <em>bygga pass</em>?</p>
+      <p class="muted">Beskriv kort dina mål och hur mycket du vill träna, så bygger AI-coachen ett förslag. Du godkänner eller ändrar innan något sparas.</p>
+      <button class="btn primary wide" data-act="coachStart">Ja, hjälp mig</button>
+      <button class="btn wide" data-act="skipOnboard">Nej, gå till appen</button></div>`;
+  if (sc === "coach") return vCoach();
+  return "";
+}
+function chips(key, opts, val) { return `<div class="chips" role="group">${opts.map(o => { const v = Array.isArray(o) ? o[0] : o, l = Array.isArray(o) ? o[1] : o; return `<button type="button" data-act="cset" data-k="${key}" data-v="${esc(v)}" aria-pressed="${String(val) === String(v)}">${esc(l)}</button>`; }).join("")}</div>`; }
+function vCoach() {
+  const c = state.coach, a = c.answers;
+  const err = c.error ? msgBox({ err: true, text: c.error }) : "";
+  if (c.step === "loading") return `<div class="screen"><p class="lead">Coachen bygger dina <em>pass</em></p><div class="loadbar"></div><p class="muted">Det tar oftast 10–30 sekunder.</p></div>`;
+  if (c.step === "result") {
+    const r = c.result;
+    return `<div class="screen"><p class="lead">Ditt <em>förslag</em></p>${err}
+      ${r.summary ? `<p class="summary">${esc(r.summary)}</p>` : ""}
+      ${r.programs.map(p => `<div class="card sugg"><div class="prog-name">${esc(p.name)}</div>${daysText(p) ? `<div class="muted small">${daysText(p)}</div>` : ""}
+        <ul>${p.exercises.map(x => `<li><span>${esc(x.name)}</span><span>${esc(planText(x))}${x.locked ? LOCK : ""}</span></li>`).join("")}</ul></div>`).join("")}
+      <p class="muted small">Tomma vikter fyller du i första gången du kör passet.</p>
+      <button class="btn primary wide" data-act="coachSave">Spara ${r.programs.length === 1 ? "passet" : "passen"}</button>
+      ${c.showFeedback ? `<div class="form"><div class="field"><label for="c-feedback">Vad vill du ändra?</label><textarea id="c-feedback" data-c="feedback" placeholder="T.ex. byt marklyft mot något skonsammare för ryggen">${esc(c.feedback)}</textarea></div>
+        <button class="btn wide" data-act="coachRedo">Gör nytt förslag</button></div>`
+        : `<button class="btn wide" data-act="coachFeedback">Ändra något</button>`}
+      ${c.remaining != null ? `<p class="muted small">${c.remaining} ${c.remaining === 1 ? "förslag" : "förslag"} kvar idag.</p>` : ""}
+      <button class="linkbtn" data-act="coachCancel">${c.from === "onboard" ? "Hoppa över och gå till appen" : "Avbryt"}</button></div>`;
+  }
+  return `<div class="screen"><p class="lead">Berätta för <em>coachen</em></p>${err}
+    <div class="form">
+      <div class="field"><label for="c-goal">Ditt mål</label><textarea id="c-goal" data-c="goal" placeholder="T.ex. bli starkare i benen och gå ner lite i vikt">${esc(a.goal)}</textarea></div>
+      <div class="field"><span class="flabel">Pass per vecka</span>${chips("perWeek", [1, 2, 3, 4, 5, 6], a.perWeek)}</div>
+      <div class="field"><span class="flabel">Minuter per pass</span>${chips("minutes", [30, 45, 60, 75, 90], a.minutes)}</div>
+      <div class="field"><span class="flabel">Dagar du helst tränar <span class="opt">(valfritt)</span></span><div class="days" role="group" aria-label="Veckodagar">
+        ${DAY_ORDER.map(d => `<button type="button" data-act="cday" data-v="${d}" aria-pressed="${a.days.includes(d)}" aria-label="${DAY_LONG[d]}">${DAY_SHORT[d]}</button>`).join("")}</div></div>
+      <div class="field"><span class="flabel">Erfarenhet</span>${chips("experience", ["Nybörjare", "Tränat en del", "Van"], a.experience)}</div>
+      <div class="field"><span class="flabel">Utrustning</span>${chips("equipment", ["Fullt gym", "Hemmagym", "Bara kroppsvikt"], a.equipment)}</div>
+      <div class="field"><label for="c-injuries">Skador eller övningar att undvika <span class="opt">(valfritt)</span></label><input id="c-injuries" type="text" data-c="injuries" value="${esc(a.injuries)}" placeholder="T.ex. ont i axeln"></div>
+      <div class="field"><label for="c-lifts">Lyft du kan <span class="opt">(valfritt)</span></label><input id="c-lifts" type="text" data-c="lifts" value="${esc(a.lifts)}" placeholder="T.ex. knäböj 80 kg × 8, bänk 60 kg × 8"></div>
+      <button class="btn primary wide" data-act="coachRun">Bygg mina pass</button>
+      <button class="linkbtn" data-act="coachCancel">${c.from === "onboard" ? "Hoppa över och gå till appen" : "Avbryt"}</button>
+    </div></div>`;
+}
+
+let toastT;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
+
+/* ---------- lookups ---------- */
+function lastFor(exId, name) {
+  const n = (name || "").trim().toLowerCase();
+  for (const s of state.sessions) {
+    const e = (s.entries || []).find(x => x.exId === exId || (n && x.name.trim().toLowerCase() === n));
+    if (e) return { e, date: s.date };
+  }
+  return null;
+}
+
+/* ---------- views ---------- */
+function vTrain() {
+  if (state.active && !state.active.paused) return vActive();
+  if (!state.loaded) return `<div class="card empty"><p class="muted">Hämtar dina program…</p></div>`;
+  if (!state.programs.length) return `<div class="card empty">${ICONS.gen.replace("<svg", '<svg width="40" height="40" style="color:var(--accent)"')}
+    <p><b>Inga program än.</b></p><p class="muted">Bygg ditt första pass med övningar, så kan du starta det här.</p>
+    <button class="btn primary" data-act="newProgram">Bygg mitt program</button></div>`;
+  const last = state.sessions[0];
+  const d = state.active;
+  const paused = d ? `<section class="section"><h2>Utkast</h2><div class="card prog">
+      <div class="prog-top"><div><div class="prog-name">${esc(d.programName)}</div><div class="muted small">Påbörjat ${dLong(d.startedAt)}</div></div>
+      <button class="btn primary" data-act="resume">Fortsätt</button></div>
+      ${state.confirm === "dropDraft" ? `<div class="btnrow"><button class="btn danger" data-act="dropDraftYes">Ja, släng utkastet</button><button class="btn" data-act="confirmNo">Behåll</button></div>`
+        : `<div class="btnrow"><button class="btn danger sm" data-act="dropDraft">Släng utkastet</button></div>`}
+      <div class="muted small">Startar du ett nytt pass ersätts utkastet.</div></div></section>` : "";
+  const today = new Date().getDay();
+  const rec = state.programs.filter(p => (p.days || []).includes(today));
+  const rest = state.programs.filter(p => !(p.days || []).includes(today));
+  const card = (p, primary) => `<div class="card prog${primary ? " rec" : ""}">
+      <div class="prog-top"><div><div class="prog-name">${esc(p.name)}</div>${daysText(p) ? `<div class="muted small">${daysText(p)}</div>` : ""}</div>
+      <button class="btn${primary ? " primary" : ""}" data-act="start" data-id="${p.id}">Starta</button></div>
+      <div class="prog-ex">${p.exercises.map(x => `<span>${esc(x.name)}</span>`).join("")}</div></div>`;
+  return `${paused}${rec.length ? `<section class="section"><h2>Rekommenderat idag · ${DAY_LONG[today]}</h2>${rec.map(p => card(p, true)).join("")}</section>` : ""}
+  ${rest.length ? `<section class="section"><h2>${rec.length ? "Övriga pass" : "Starta pass"}</h2>${rest.map(p => card(p, !rec.length)).join("")}</section>` : ""}
+  ${last ? `<section class="section"><h2>Senaste passet</h2>${sessCard(last, false)}</section>` : ""}`;
+}
+
+function vActive() {
+  const a = state.active;
+  const rows = a.entries.map((e, i) => {
+    const prev = lastFor(e.exId, e.name);
+    const prevTxt = prev ? `Förra: <b class="num">${esc(fmtEntry(prev.e))}</b> · ${dShort(prev.date)}` : "Första gången";
+    const head = `<div class="fig">${ICONS[e.icon] || ICONS.gen}</div>
+      <div class="name">${esc(e.name)}${e.locked ? ` <span class="chip lock">Låst</span>` : ""}</div>
+      <div class="prev">${e.locked ? "Samma varje pass" : prevTxt}</div>`;
+    if (e.locked) return `<div class="row">${head}<div class="fixed">Idag: <b class="num">${esc(fmtEntry(e))}</b></div></div>`;
+    const ph = prev ? prev.e : (e.plan || {});
+    const f = (key, label, mode, placeholder) => `<div class="field box"><label for="a-${i}-${key}">${label}</label>
+      <input id="a-${i}-${key}" inputmode="${mode}" data-a="${i}" data-f="${key}" value="${esc(e[key] ?? "")}" placeholder="${placeholder ?? ""}"></div>`;
+    const inputs = [];
+    if (e.type === "kg") inputs.push(f("value", "Kilo", "decimal", ph.value != null ? fmtNum(ph.value) : ""));
+    if (e.type === "time") inputs.push(f("value", "Min", "decimal", ph.value != null ? fmtNum(ph.value) : ""));
+    if (e.type !== "time") inputs.push(f("reps", "Reps", "numeric", ph.reps ?? ""));
+    inputs.push(f("sets", "Set", "numeric", ph.sets ?? ""));
+    return `<div class="row">${head}<div class="inputs">${inputs.join("")}</div></div>`;
+  }).join("");
+  const c = state.confirm === "cancel";
+  return `<section class="section">
+    <div><div class="prog-name">${esc(a.programName)}</div><div class="muted small">${dLong(a.startedAt)} · grå siffror visar förra passet</div></div>
+    <div class="rows">${rows}</div>
+    <button class="btn primary wide" data-act="finish">Spara pass</button>
+    ${c ? `<div class="card btnrow"><span style="flex:1 1 100%">Avbryta passet? Det du fyllt i sparas inte.</span>
+      <button class="btn danger" data-act="cancelYes">Ja, avbryt</button><button class="btn" data-act="confirmNo">Fortsätt träna</button></div>`
+      : `<button class="btn wide" data-act="cancel">Avbryt passet</button>`}
+  </section>`;
+}
+
+function vPrograms() {
+  if (state.editing) return vEditor();
+  return `<section class="section"><h2>Mina program</h2>
+    ${state.programs.length ? state.programs.map(p => `<div class="card prog">
+      <div class="prog-top"><div><div class="prog-name">${esc(p.name)}</div><div class="muted small">${p.exercises.length} övningar${daysText(p) ? " · " + daysText(p) : ""}</div></div>
+      <button class="btn sm" data-act="edit" data-id="${p.id}">Redigera</button></div>
+      <div class="prog-ex">${p.exercises.map(x => `<span>${esc(x.name)}${x.locked ? " · låst" : ""}</span>`).join("")}</div></div>`).join("")
+    : `<div class="card empty"><p class="muted">Du har inga program än.</p></div>`}
+    <button class="btn primary wide" data-act="newProgram">Bygg nytt program</button></section>
+    <section class="section"><h2>Coach</h2><div class="card section">
+      <p class="muted small" style="margin:0">Låt AI-coachen föreslå nya pass utifrån dina mål. Du godkänner innan något sparas.</p>
+      <button class="btn wide" data-act="openCoach">Fråga coachen</button></div></section>
+    <section class="section"><h2>Egen kopia</h2><div class="card section">
+      <p class="muted small" style="margin:0">Allt sparas i ditt konto. Vill du ha en egen fil med all data kan du exportera den.</p>
+      <div class="btnrow"><button class="btn" data-act="export">Exportera</button></div></div></section>`;
+}
+
+function vEditor() {
+  const p = state.editing;
+  const exs = p.exercises.map((x, i) => {
+    const typeOpts = Object.entries(TYPES).map(([k, v]) => `<option value="${k}"${x.type === k ? " selected" : ""}>${v}</option>`).join("");
+    const iconOpts = Object.entries(ICON_NAMES).map(([k, v]) => `<option value="${k}"${x.icon === k ? " selected" : ""}>${v}</option>`).join("");
+    if (!state.open.has(x.id) && x.name.trim()) {
+      return `<button class="ex-mini" data-act="openEx" data-i="${i}" aria-label="Redigera ${esc(x.name)}">
+        <span class="fig">${ICONS[x.icon] || ICONS.gen}</span><span class="nm">${esc(x.name)}</span>
+        <span class="sum">${esc(planText(x))}${x.locked ? LOCK : ""}</span></button>`;
+    }
+    const fx = (key, label, mode) => `<div class="field box"><label for="e-${i}-${key}">${label}</label><input id="e-${i}-${key}" inputmode="${mode}" data-e="${i}" data-f="${key}" value="${esc(x[key] ?? "")}"></div>`;
+    const fs = [];
+    if (x.type === "kg") fs.push(fx("value", "Kilo", "decimal"));
+    if (x.type === "time") fs.push(fx("value", "Min", "decimal"));
+    if (x.type !== "time") fs.push(fx("reps", "Reps", "numeric"));
+    fs.push(fx("sets", "Set", "numeric"));
+    fs.push(`<button class="lockbtn" data-act="lock" data-i="${i}" aria-pressed="${!!x.locked}" aria-label="Lås övningen" title="Låst: samma varje pass">${x.locked ? LOCK : UNLOCK}</button>`);
+    const fixed = `<div class="inputs" style="margin:0">${fs.join("")}</div>`;
+    return `<div class="ex-edit">
+      <div class="ex-head"><div class="fig">${ICONS[x.icon] || ICONS.gen}</div>
+        <input id="e-${i}-name" type="text" aria-label="Övningens namn" placeholder="Övningens namn" data-e="${i}" data-f="name" value="${esc(x.name)}">
+        <div class="iconbtns">
+          <button class="iconbtn" data-act="up" data-i="${i}" aria-label="Flytta upp"${i === 0 ? " disabled" : ""}>${S('<path d="M12 18V6M6.5 11.5L12 6l5.5 5.5"/>')}</button>
+          <button class="iconbtn" data-act="down" data-i="${i}" aria-label="Flytta ner"${i === p.exercises.length - 1 ? " disabled" : ""}>${S('<path d="M12 6v12M6.5 12.5L12 18l5.5-5.5"/>')}</button>
+          <button class="iconbtn" data-act="delEx" data-i="${i}" aria-label="Ta bort övning">${S('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
+        </div></div>
+      <div class="two">
+        <div class="field"><label for="e-${i}-type">Mäts i</label><select id="e-${i}-type" data-e="${i}" data-f="type">${typeOpts}</select></div>
+        <div class="field"><label for="e-${i}-icon">Figur</label><select id="e-${i}-icon" data-e="${i}" data-f="icon">${iconOpts}</select></div>
+      </div>
+      ${fixed}
+      <button class="btn sm" data-act="closeEx" data-i="${i}" style="align-self:flex-start">Klar</button>
+    </div>`;
+  }).join("");
+  const isNew = !state.programs.some(q => q.id === p.id);
+  const c = state.confirm === "delProgram";
+  return `<section class="section">
+    <h2>${isNew ? "Bygg mitt program" : "Redigera program"}</h2>
+    <div class="field"><label for="p-name">Namn på passet</label><input id="p-name" type="text" data-p="name" value="${esc(p.name)}" placeholder="T.ex. Pass A eller Ben"></div>
+    <div class="field"><label>Dagar jag kör passet</label><div class="days" role="group" aria-label="Veckodagar">
+      ${DAY_ORDER.map(d => `<button data-act="day" data-v="${d}" aria-pressed="${(p.days || []).includes(d)}" aria-label="${DAY_LONG[d]}">${DAY_SHORT[d]}</button>`).join("")}</div></div>
+    <div class="rows">${exs || `<div class="empty"><p class="muted">Inga övningar än. Lägg till din första nedan.</p></div>`}</div>
+    <button class="btn wide" data-act="addEx">+ Lägg till övning</button>
+    <p class="muted small" style="margin:0">Tryck på låset för övningar som är samma varje gång, som uppvärmning. De får inga rutor när du kör passet. Reps och set som är 1 visas inte.</p>
+    <div class="btnrow"><button class="btn primary" data-act="saveProgram">Spara program</button><button class="btn" data-act="closeEdit">Avbryt</button></div>
+    ${isNew ? "" : c ? `<div class="card btnrow"><span style="flex:1 1 100%">Ta bort ${esc(p.name)}? Sparade pass ligger kvar i historiken.</span>
+      <button class="btn danger" data-act="delProgramYes">Ja, ta bort</button><button class="btn" data-act="confirmNo">Behåll</button></div>`
+      : `<button class="btn danger wide" data-act="delProgram">Ta bort programmet</button>`}
+  </section>`;
+}
+
+function sessCard(s, withDelete) {
+  const c = state.confirm === "del-" + s.id;
+  return `<div class="card sess">
+    <div class="sess-head"><div><div class="sess-date">${dLong(s.date)}</div><div class="muted small">${esc(s.programName)}${s.example ? ` <span class="chip">Exempel</span>` : ""}</div></div>
+    ${withDelete && !c ? `<button class="btn sm danger" data-act="delSess" data-id="${s.id}">Ta bort</button>` : ""}</div>
+    <ul>${(s.entries || []).map(e => `<li><span>${esc(e.name)}</span><span>${esc(fmtEntry(e))}</span></li>`).join("")}</ul>
+    ${c ? `<div class="btnrow"><button class="btn danger" data-act="delSessYes" data-id="${s.id}">Ja, ta bort passet</button><button class="btn" data-act="confirmNo">Behåll</button></div>` : ""}
+  </div>`;
+}
+
+const dayKey = d => d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+function yearGrid() {
+  const now = new Date(), y = state.year || now.getFullYear();
+  const logged = new Set(state.sessions.map(s => dayKey(new Date(s.date))));
+  const n = Math.round((new Date(y + 1, 0, 1) - new Date(y, 0, 1)) / 864e5);
+  let cells = "", count = 0;
+  for (let i = 0; i < n; i++) {
+    const d = new Date(y, 0, 1 + i), k = dayKey(d), on = logged.has(k);
+    if (on) count++;
+    cells += `<i class="${on ? "on" : ""}${k === dayKey(now) ? " today" : ""}" title="${d.toLocaleDateString("sv-SE", { day: "numeric", month: "long" })}${on ? " · pass loggat" : ""}"></i>`;
+  }
+  return `<div class="card section">
+    <div class="yhead"><button class="iconbtn" data-act="year" data-v="-1" aria-label="Föregående år">${S('<path d="M15 5l-7 7 7 7"/>')}</button>
+      <div style="text-align:center"><div class="y">${y}</div><div class="muted small">${count} ${count === 1 ? "dag" : "dagar"} med pass</div></div>
+      <button class="iconbtn" data-act="year" data-v="1" aria-label="Nästa år">${S('<path d="M9 5l7 7-7 7"/>')}</button></div>
+    <div class="yg" role="img" aria-label="${count} dagar med pass under ${y}">${cells}</div>
+    <div class="legend"><span><i></i>Inget pass</span><span><i class="on"></i>Pass loggat</span><span>1 jan uppe till vänster</span></div>
+  </div>`;
+}
+function vHistory() {
+  if (!state.sessions.length) return yearGrid() + `<div class="card empty"><p><b>Inga pass sparade än.</b></p><p class="muted">När du sparar ett pass hamnar det här.</p></div>`;
+  const ex = state.sessions.filter(s => s.example).length;
+  return `${yearGrid()}${ex ? `<div class="banner"><span>${ex} exempelpass visas så du ser hur det ser ut.</span>
+    ${state.confirm === "clearEx" ? `<span class="btnrow"><button class="btn sm danger" data-act="clearExYes">Ja, ta bort</button><button class="btn sm" data-act="confirmNo">Nej</button></span>`
+      : `<button class="btn sm" data-act="clearEx">Ta bort exempel</button>`}</div>` : ""}
+    <section class="section"><h2>${state.sessions.length} pass</h2>${state.sessions.map(s => sessCard(s, true)).join("")}</section>`;
+}
+
+function passIndex() {
+  const map = new Map();
+  for (const s of state.sessions) { const k = s.programId || s.programName; if (!map.has(k)) map.set(k, { key: k, name: s.programName }); }
+  for (const p of state.programs) if (map.has(p.id)) map.get(p.id).name = p.name;
+  return [...map.values()];
+}
+function exerciseIndex(passKey) {
+  const map = new Map();
+  const ss = state.sessions.filter(s => (s.programId || s.programName) === passKey);
+  for (const s of ss.slice().reverse()) for (const e of (s.entries || [])) {
+    if (e.locked) continue;
+    const key = e.name.trim().toLowerCase();
+    if (!map.has(key)) map.set(key, { key, name: e.name, type: e.type, icon: e.icon, points: [] });
+    const m = map.get(key); m.name = e.name; m.type = e.type;
+    m.points.push({ date: s.date, y: metric(e), e });
+  }
+  return [...map.values()];
+}
+
+function vProgress() {
+  const passes = passIndex();
+  if (!passes.length) return `<div class="card empty"><p><b>Ingen progression än.</b></p><p class="muted">Spara ett par pass så ritas en graf per övning här.</p></div>`;
+  if (!state.progPass || !passes.some(p => p.key === state.progPass)) state.progPass = passes[0].key;
+  const passSel = `<div class="field"><label for="prog-pass">Pass</label><select id="prog-pass" data-act-change="progPass">
+      ${passes.map(p => `<option value="${esc(p.key)}"${p.key === state.progPass ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>`;
+  const list = exerciseIndex(state.progPass);
+  if (!list.length) return `<section class="section">${passSel}<div class="card empty"><p class="muted">Det här passet har bara låsta övningar, så det finns ingen progression att visa.</p></div></section>`;
+  if (!state.progKey || !list.some(x => x.key === state.progKey)) state.progKey = (list.find(x => x.type === "kg") || list[0]).key;
+  const cur = list.find(x => x.key === state.progKey);
+  const u = metricUnit(cur.type);
+  const ys = cur.points.map(p => p.y);
+  const first = ys[0], lastV = ys[ys.length - 1], best = Math.max(...ys);
+  const diff = lastV - first;
+  return `<section class="section">
+    ${passSel}
+    <div class="field"><label for="prog-ex">Övning</label><select id="prog-ex" data-act-change="progEx">
+      ${list.map(x => `<option value="${esc(x.key)}"${x.key === cur.key ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>
+    <div class="stats">
+      <div class="stat"><div class="k">Senast</div><div class="v">${fmtNum(lastV)} <span class="small muted">${u}</span></div></div>
+      <div class="stat"><div class="k">Bästa</div><div class="v">${fmtNum(best)} <span class="small muted">${u}</span></div></div>
+      <div class="stat"><div class="k">Ökning</div><div class="v">${diff > 0 ? "+" : ""}${fmtNum(diff)} <span class="small muted">${u}</span></div></div>
+    </div>
+    <div class="card">${chart(cur.points, u)}</div>
+    <h2>Alla pass · ${esc(cur.name)}</h2>
+    <div class="card sess"><ul>${cur.points.slice().reverse().map(p => `<li><span>${dShort(p.date)}</span><span>${esc(fmtEntry(p.e))}</span></li>`).join("")}</ul></div>
+  </section>`;
+}
+
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p; }
+function chart(points, unit) {
+  const W = 640, H = 260, L = 46, R = 22, T = 26, B = 34;
+  const ys = points.map(p => p.y);
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  if (lo === hi) { lo -= Math.max(1, lo * 0.1); hi += Math.max(1, hi * 0.1); }
+  const step = niceStep((hi - lo) / 4);
+  lo = Math.max(0, Math.floor(lo / step) * step); hi = Math.ceil(hi / step) * step;
+  const x = i => points.length === 1 ? L + (W - L - R) / 2 : L + i * (W - L - R) / (points.length - 1);
+  const y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+  let g = "";
+  for (let v = lo; v <= hi + step / 2; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${fmtNum(v)}</text>`;
+  const n = points.length, every = Math.max(1, Math.ceil(n / 6));
+  let xl = "";
+  points.forEach((p, i) => { if (i % every === 0 || i === n - 1) { if (i !== n - 1 && n - 1 - i < every) return; xl += `<text x="${x(i)}" y="${H - 10}" text-anchor="${n === 1 ? "middle" : i === 0 ? "start" : i === n - 1 ? "end" : "middle"}">${dShort(p.date)}</text>`; } });
+  const pts = points.map((p, i) => `${x(i)},${y(p.y)}`).join(" ");
+  const area = n > 1 ? `<polygon class="ar" points="${x(0)},${y(lo)} ${pts} ${x(n - 1)},${y(lo)}"/>` : "";
+  const dots = points.map((p, i) => i === n - 1 ? "" : `<circle class="dt" cx="${x(i)}" cy="${y(p.y)}" r="4"/>`).join("");
+  const ex = x(n - 1), ey = y(points[n - 1].y);
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf över ${unit} per pass">
+    ${g}${xl}${area}${n > 1 ? `<polyline class="ln" points="${pts}"/>` : ""}${dots}
+    <circle class="end" cx="${ex}" cy="${ey}" r="6"/>
+    <text class="endlbl" x="${ex}" y="${ey < T + 18 ? ey + 22 : ey - 12}" text-anchor="${n === 1 ? "middle" : "end"}">${fmtNum(points[n - 1].y)} ${unit}</text></svg>`;
+}
+
+/* ---------- render ---------- */
+let pending = false;
+function render(force) {
+  const a = document.activeElement;
+  if (!force && a && main.contains(a) && /INPUT|SELECT/.test(a.tagName)) { pending = true; return; }
+  pending = false;
+  if (state.screen !== "app") {
+    $("#title").textContent = "Gymloggen"; $("#burger").hidden = true; $("#menu").hidden = true; state.menu = false;
+    renderModal(); main.innerHTML = vScreen(); return;
+  }
+  $("#burger").hidden = false;
+  const titles = { trana: state.active && !state.active.paused ? "Pass pågår" : "Träna", program: "Program", historik: "Historik", progression: "Progression" };
+  $("#title").textContent = titles[state.view];
+  $("#tabs").innerHTML = TABS.map(([k, v]) => `<button data-tab="${k}"${state.view === k ? ' aria-current="page"' : ""}>${TAB_ICONS[k]}<span>${v}</span></button>`).join("");
+  $("#tabs").innerHTML += `<button data-act="openCoach">${S('<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/>')}<span>Fråga coachen</span></button>`;
+  $("#account").innerHTML = state.user ? `<span class="muted small">${esc(state.user.email || "")}</span><button class="btn sm" data-act="logout">Logga ut</button>` : "";
+  $("#menu").hidden = !state.menu; $("#burger").setAttribute("aria-expanded", String(!!state.menu));
+  renderModal();
+  main.innerHTML = state.view === "trana" ? vTrain() : state.view === "program" ? vPrograms() : state.view === "historik" ? vHistory() : vProgress();
+}
+main.addEventListener("focusout", () => { if (pending) setTimeout(() => { const a = document.activeElement; if (!(a && main.contains(a) && /INPUT|SELECT/.test(a.tagName))) render(true); }, 0); });
+
+const dirty = () => !!state.editing && JSON.stringify(state.editing) !== state.editOrig;
+function renderModal() {
+  const m = $("#modal"), md = state.modal;
+  if (!md) { m.hidden = true; m.innerHTML = ""; return; }
+  m.hidden = false;
+  m.innerHTML = md.kind === "pass"
+    ? `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mt"><h3 id="mt">Avsluta passet?</h3>
+        <p>Du har ett pass igång. Vill du spara det du fyllt i som utkast eller slänga det?</p>
+        <button class="btn" data-act="mBack">Gå tillbaka</button>
+        <button class="btn primary" data-act="mDraft">Spara som utkast</button>
+        <button class="btn danger" data-act="mDrop">Släng passet</button></div>`
+    : `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mt"><h3 id="mt">Osparade ändringar</h3>
+        <p>Du har ändrat i programmet utan att spara.</p>
+        <button class="btn" data-act="mBack">Gå tillbaka</button>
+        <button class="btn primary" data-act="mSaveProg">Spara programmet</button>
+        <button class="btn danger" data-act="mDropEdit">Släng ändringarna</button></div>`;
+  const first = m.querySelector("button"); first && first.focus();
+}
+function leave(next) {
+  if (state.view === "program" && dirty()) { state.modal = { kind: "edit", next }; render(true); return; }
+  if (state.view === "program") state.editing = null;
+  go(next);
+}
+function saveProgram() {
+  const E = state.editing;
+  E.name = E.name.trim(); E.exercises = E.exercises.filter(x => x.name.trim());
+  if (!E.name) { toast("Ge programmet ett namn först."); return false; }
+  if (!E.exercises.length) { toast("Lägg till minst en övning med namn."); return false; }
+  E.exercises.forEach(x => { x.name = x.name.trim(); x.locked = !!x.locked; x.value = x.type === "bw" ? null : num(x.value); x.reps = x.type === "time" ? 1 : (num(x.reps) || 1); x.sets = num(x.sets) || 1; });
+  const list = state.programs.slice(); const at = list.findIndex(p => p.id === E.id);
+  at >= 0 ? list[at] = E : list.push(E);
+  Store.savePrograms(list); state.editing = null; toast("Programmet sparat"); return true;
+}
+function go(view) { state.view = view; state.confirm = null; try { history.replaceState(null, "", "#" + view); } catch (_) { location.hash = view; } render(true); window.scrollTo(0, 0); }
+function fromHash() { const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) state.view = h; }
+window.addEventListener("hashchange", () => { fromHash(); render(true); });
+
+/* ---------- actions ---------- */
+const newEx = () => ({ id: uid(), name: "", type: "kg", icon: "gen", locked: false });
+document.addEventListener("click", ev => {
+  if (state.menu && !ev.target.closest("#menu") && !ev.target.closest("#burger")) { state.menu = false; $("#menu").hidden = true; $("#burger").setAttribute("aria-expanded", "false"); return; }
+  const tab = ev.target.closest("[data-tab]"); if (tab) { state.menu = false; if (tab.dataset.tab === state.view) return render(true); }
+  if (tab) return tab.dataset.tab === state.view ? null : leave(tab.dataset.tab);
+  if (ev.target === $("#modal")) { state.modal = null; return render(true); }
+  const b = ev.target.closest("[data-act]"); if (!b || b.disabled) return;
+  const act = b.dataset.act, id = b.dataset.id, i = +b.dataset.i;
+  const E = state.editing;
+  switch (act) {
+    case "newProgram": state.editing = { id: uid(), name: "", exercises: [newEx()] }; state.open = new Set([state.editing.exercises[0].id]); state.editOrig = JSON.stringify(state.editing); state.view = "program"; break;
+    case "edit": state.editing = clone(state.programs.find(p => p.id === id)); state.editOrig = JSON.stringify(state.editing); state.open = new Set(); break;
+    case "closeEdit": state.editing = null; break;
+    case "addEx": { const nx = newEx(); E.exercises.forEach(x => { if (x.name.trim()) state.open.delete(x.id); }); E.exercises.push(nx); state.open.add(nx.id); render(true); const el = document.getElementById(`e-${E.exercises.length - 1}-name`); el && el.focus(); return; }
+    case "openEx": state.open.add(E.exercises[i].id); break;
+    case "closeEx": if (!E.exercises[i].name.trim()) { toast("Ge övningen ett namn först."); return; } state.open.delete(E.exercises[i].id); break;
+    case "delEx": state.open.delete(E.exercises[i].id); E.exercises.splice(i, 1); break;
+    case "up": [E.exercises[i - 1], E.exercises[i]] = [E.exercises[i], E.exercises[i - 1]]; break;
+    case "down": [E.exercises[i + 1], E.exercises[i]] = [E.exercises[i], E.exercises[i + 1]]; break;
+    case "lock": E.exercises[i].locked = !E.exercises[i].locked; break;
+    case "day": { const d = +b.dataset.v; const set = new Set(E.days || []); set.has(d) ? set.delete(d) : set.add(d); E.days = DAY_ORDER.filter(x => set.has(x)); break; }
+    case "saveProgram": if (!saveProgram()) return; break;
+    case "delProgram": state.confirm = "delProgram"; break;
+    case "delProgramYes": Store.savePrograms(state.programs.filter(p => p.id !== E.id)); state.editing = null; state.confirm = null; toast("Programmet borttaget"); break;
+    case "start": {
+      const p = state.programs.find(q => q.id === id);
+      state.active = { programId: p.id, programName: p.name, startedAt: new Date().toISOString(),
+        entries: p.exercises.map(x => x.locked ? { exId: x.id, name: x.name, type: x.type, icon: x.icon, locked: true, value: x.value ?? null, reps: x.reps || 1, sets: x.sets || 1 }
+          : { exId: x.id, name: x.name, type: x.type, icon: x.icon, locked: false, value: "", reps: "", sets: "",
+              plan: { value: x.value ?? null, reps: x.reps > 1 ? x.reps : null, sets: x.sets > 1 ? x.sets : null } }) };
+      saveDraft(); break;
+    }
+    case "finish": {
+      const a = state.active; const entries = [];
+      for (const e of a.entries) {
+        if (e.locked) { entries.push({ exId: e.exId, name: e.name, type: e.type, icon: e.icon, locked: true, value: e.value, reps: e.reps, sets: e.sets }); continue; }
+        const value = num(e.value), reps = num(e.reps), sets = num(e.sets);
+        const filled = e.type === "bw" ? reps != null : value != null;
+        if (!filled) continue;
+        entries.push({ exId: e.exId, name: e.name, type: e.type, icon: e.icon, locked: false, value: e.type === "bw" ? null : value, reps: e.type === "time" ? 1 : (reps || 1), sets: sets || 1 });
+      }
+      if (!entries.length) { toast("Fyll i minst en övning innan du sparar."); return; }
+      Store.addSession({ id: uid(), date: new Date().toISOString(), programId: a.programId, programName: a.programName, entries });
+      state.active = null; saveDraft(); toast("Passet sparat"); break;
+    }
+    case "cancel": state.confirm = "cancel"; break;
+    case "cancelYes": state.active = null; saveDraft(); state.confirm = null; break;
+    case "delSess": state.confirm = "del-" + id; break;
+    case "delSessYes": Store.deleteSession(id); state.confirm = null; toast("Passet borttaget"); break;
+    case "clearEx": state.confirm = "clearEx"; break;
+    case "clearExYes": state.sessions.filter(s => s.example).forEach(s => Store.deleteSession(s.id)); state.confirm = null; toast("Exempelpassen borttagna"); break;
+    case "confirmNo": state.confirm = null; break;
+    case "export": exportData(); return;
+    case "importNo": state.pendingImport = null; break;
+    case "importYes": { const d = state.pendingImport; state.pendingImport = null; Store.writeLocal(d); state.programs = d.programs; state.sessions = sortS(d.sessions); toast("Data importerad"); break; }
+    case "menu": state.menu = !state.menu; break;
+    case "reload": location.reload(); return;
+    case "authMode": state.authMode = b.dataset.v; state.authMsg = null; { const e = $("#au-email"); if (e) state.authEmail = e.value; } break;
+    case "google": {
+      state.busy = true; render(true);
+      sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirectTo() } }).then(({ error }) => { if (error) { state.busy = false; state.authMsg = { err: true, text: authErr(error) }; render(true); } });
+      return;
+    }
+    case "logout": state.menu = false; Auth.logout(); return;
+    case "importLegacy": {
+      const L = state.legacy; state.legacy = null;
+      const keep = (L.sessions || []).filter(x => !x.example);
+      Store.savePrograms(clone(L.programs || []));
+      keep.forEach(x => Store.addSession(clone(x)));
+      try { localStorage.setItem("gymloggen-v1-handled", "1"); } catch (_) {}
+      Auth.markOnboarded(); state.screen = "app";
+      toast("Datan är flyttad till ditt konto"); break;
+    }
+    case "skipLegacy": try { localStorage.setItem("gymloggen-v1-handled", "1"); } catch (_) {} state.legacy = null; state.screen = Store.get("onboarded", false) ? "app" : "onboard"; break;
+    case "skipOnboard": Auth.markOnboarded(); state.screen = "app"; break;
+    case "coachStart": state.coach = newCoach("onboard"); state.screen = "coach"; break;
+    case "openCoach": {
+      if (state.view === "program" && dirty()) { toast("Spara eller avbryt programmet först."); return; }
+      state.menu = false; state.editing = null; state.coach = newCoach("app"); state.screen = "coach"; window.scrollTo(0, 0); break;
+    }
+    case "cset": { const k = b.dataset.k, v = b.dataset.v; state.coach.answers[k] = /^\d+$/.test(v) ? +v : v; break; }
+    case "cday": { const d = +b.dataset.v, a = state.coach.answers; a.days = a.days.includes(d) ? a.days.filter(x => x !== d) : DAY_ORDER.filter(x => x === d || a.days.includes(x)); break; }
+    case "coachRun": runCoach(false); return;
+    case "coachRedo": runCoach(true); return;
+    case "coachFeedback": state.coach.showFeedback = true; render(true); { const t = $("#c-feedback"); t && t.focus(); } return;
+    case "coachSave": saveCoach(); return;
+    case "coachCancel": { const from = state.coach && state.coach.from; state.coach = null; if (from === "onboard") Auth.markOnboarded(); state.screen = "app"; break; }
+    case "title": {
+      if (state.screen !== "app") return;
+      state.confirm = null;
+      if (state.view === "trana" && state.active && !state.active.paused) { state.modal = { kind: "pass" }; break; }
+      if (state.view === "program" && state.editing) { if (dirty()) { state.modal = { kind: "edit", next: "program" }; break; } state.editing = null; }
+      if (state.view === "historik") state.year = null;
+      window.scrollTo(0, 0); break;
+    }
+    case "mBack": state.modal = null; break;
+    case "mDraft": state.active.paused = true; saveDraft(); state.modal = null; toast("Sparat som utkast"); window.scrollTo(0, 0); break;
+    case "mDrop": state.active = null; saveDraft(); state.modal = null; toast("Passet slängt"); window.scrollTo(0, 0); break;
+    case "mSaveProg": { const next = state.modal.next; state.modal = null; if (!saveProgram()) break; go(next); return; }
+    case "mDropEdit": { const next = state.modal.next; state.modal = null; state.editing = null; go(next); return; }
+    case "resume": state.active.paused = false; saveDraft(); break;
+    case "dropDraft": state.confirm = "dropDraft"; break;
+    case "dropDraftYes": state.active = null; saveDraft(); state.confirm = null; break;
+    case "year": state.year = (state.year || new Date().getFullYear()) + (+b.dataset.v); break;
+  }
+  render(true);
+});
+
+document.addEventListener("input", ev => {
+  const t = ev.target;
+  if (t.dataset.c && state.coach) { if (t.dataset.c === "feedback") state.coach.feedback = t.value; else state.coach.answers[t.dataset.c] = t.value; return; }
+  if (t.dataset.a != null) { state.active.entries[+t.dataset.a][t.dataset.f] = t.value; saveDraft(); }
+  else if (t.dataset.e != null && t.tagName === "INPUT") state.editing.exercises[+t.dataset.e][t.dataset.f] = t.value;
+  else if (t.dataset.p) state.editing[t.dataset.p] = t.value;
+});
+document.addEventListener("change", ev => {
+  const t = ev.target;
+  if (t.id === "imp" && t.files && t.files[0]) {
+    const fr = new FileReader();
+    fr.onload = () => {
+      try {
+        const d = JSON.parse(fr.result);
+        if (!Array.isArray(d.programs) || !Array.isArray(d.sessions)) throw 0;
+        state.pendingImport = { programs: d.programs, sessions: d.sessions }; render(true);
+      } catch (_) { toast("Filen är inte en säkerhetskopia från Gymloggen."); }
+    };
+    fr.readAsText(t.files[0]); t.value = ""; return;
+  }
+  if (t.dataset.actChange === "progEx") { state.progKey = t.value; render(true); return; }
+  if (t.dataset.actChange === "progPass") { state.progPass = t.value; state.progKey = null; render(true); return; }
+  if (t.dataset.e != null && t.tagName === "SELECT") { state.editing.exercises[+t.dataset.e][t.dataset.f] = t.value; render(true); }
+});
+
+async function exportData() {
+  const d = { programs: state.programs, sessions: state.sessions };
+  const name = "gymloggen-" + new Date().toISOString().slice(0, 10) + ".json";
+  const blob = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" });
+  try {
+    const file = new File([blob], name, { type: "application/json" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Gymloggen säkerhetskopia" }); return; }
+  } catch (e) { if (e && e.name === "AbortError") return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast("Säkerhetskopian sparad");
+}
+document.addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const f = ev.target;
+  if (f.id === "authform") {
+    const email = ($("#au-email").value || "").trim(), passEl = $("#au-pass"), pass = passEl ? passEl.value : "";
+    state.authEmail = email;
+    if (!email) { state.authMsg = { err: true, text: "Fyll i din e-post." }; return render(true); }
+    if (state.authMode !== "reset" && pass.length < 6) { state.authMsg = { err: true, text: "Lösenordet måste vara minst 6 tecken." }; return render(true); }
+    state.busy = true; state.authMsg = null; render(true);
+    try {
+      if (state.authMode === "in") {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+        if (error) throw error;
+        state.busy = false; return Auth.enter(data.user);
+      }
+      if (state.authMode === "up") {
+        const { data, error } = await sb.auth.signUp({ email, password: pass, options: { emailRedirectTo: redirectTo() } });
+        if (error) throw error;
+        state.busy = false;
+        if (data.session) return Auth.enter(data.user);
+        state.authMode = "in"; state.authMsg = { text: `Vi har skickat ett mejl till ${email}. Klicka på länken i mejlet för att bekräfta kontot, och logga sedan in här.` };
+        return render(true);
+      }
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: redirectTo() });
+      if (error) throw error;
+      state.busy = false; state.authMode = "in"; state.authMsg = { text: `Om det finns ett konto för ${email} har vi skickat en länk för att välja nytt lösenord.` };
+      render(true);
+    } catch (e) { state.busy = false; state.authMsg = { err: true, text: authErr(e) }; render(true); }
+    return;
+  }
+  if (f.id === "recoverform") {
+    const pass = $("#au-new").value || "";
+    if (pass.length < 6) { state.authMsg = { err: true, text: "Lösenordet måste vara minst 6 tecken." }; return render(true); }
+    state.busy = true; render(true);
+    const { data, error } = await sb.auth.updateUser({ password: pass });
+    state.busy = false;
+    if (error) { state.authMsg = { err: true, text: authErr(error) }; return render(true); }
+    toast("Lösenordet är bytt"); return Auth.enter(data.user);
+  }
+});
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && (state.modal || state.menu)) { state.modal = null; state.menu = false; render(true); } });
+fromHash(); render(true); Auth.init();
+})();
+</script>
+</body>
+</html>
