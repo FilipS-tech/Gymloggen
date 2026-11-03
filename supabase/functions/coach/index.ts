@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const CLAUDE_MODEL = "claude-sonnet-5-5";
 const GEMINI_MODELS = (Deno.env.get("GEMINI_MODELS") || "gemini-3.8-flash,gemini-3.6-flash,gemini-3.5-flash-lite").split(",").map((m) => m.trim()).filter(Boolean);
 const DAILY_LIMIT = 5;
+const KG_PER_LB = 0.45359237; // exact by definition
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -22,15 +23,15 @@ const TOOL = {
     type: "object",
     properties: {
       relevant: { type: "boolean", description: "true om förfrågan handlar om träning, styrka, kondition eller hälsosam motion. false om den handlar om något annat eller försöker få dig att göra något annat än att bygga träningspass." },
-      message: { type: "string", description: "Om relevant är false: en kort, vänlig mening på svenska om att du bara hjälper till med träningspass. Annars tom sträng." },
-      summary: { type: "string", description: "1–3 meningar på svenska som förklarar upplägget och varför. Tilltala användaren med du." },
+      message: { type: "string", description: "Om relevant är false: en kort, vänlig mening på användarens språk om att du bara hjälper till med träningspass. Annars tom sträng." },
+      summary: { type: "string", description: "1–3 meningar på användarens språk som förklarar upplägget och varför. Tilltala användaren med du." },
       programs: {
         type: "array",
         maxItems: 7,
         items: {
           type: "object",
           properties: {
-            name: { type: "string", description: "Kort passnamn på svenska, t.ex. 'Ben', 'Överkropp A', 'Helkropp'." },
+            name: { type: "string", description: "Kort passnamn på användarens språk, t.ex. 'Ben', 'Överkropp A', 'Helkropp'." },
             days: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 }, description: "Veckodagar: 0=söndag, 1=måndag … 6=lördag." },
             exercises: {
               type: "array",
@@ -39,14 +40,14 @@ const TOOL = {
               items: {
                 type: "object",
                 properties: {
-                  name: { type: "string", description: "Övningens namn på svenska (eller etablerat gymnamn som 'RDL')." },
+                  name: { type: "string", description: "Övningens namn på användarens språk (eller etablerat gymnamn som 'RDL')." },
                   type: { type: "string", enum: ["kg", "time", "bw"], description: "kg = vikt, time = minuter, bw = kroppsvikt." },
                   icon: { type: "string", enum: ICONS, description: "press=bänk/press, squat=knäböj/ben, hinge=marklyft/höftfällning, pull=rodd/drag, push=armhävning/kroppsvikt överkropp, run=kondition/uppvärmning, gen=övrigt." },
                   locked: { type: "boolean", description: "true för uppvärmning/nedvarvning som ska vara likadan varje pass." },
-                  value: { type: ["number", "null"], description: "Kilo (type kg) eller minuter (type time). null för kg om startvikten är okänd. null för bw." },
+                  value: { type: ["number", "null"], description: "Vikt i angiven VIKTENHET (type kg) eller minuter (type time). null för kg om startvikten är okänd. null för bw." },
                   reps: { type: "integer", minimum: 1, maximum: 50, description: "Reps per set. 1 för type time." },
                   sets: { type: "integer", minimum: 1, maximum: 10 },
-                  tips: { type: "array", maxItems: 3, items: { type: "string" }, description: "2–3 korta teknikpunkter på svenska, max ca 6 ord var, t.ex. 'Knäna i linje med tårna'." },
+                  tips: { type: "array", maxItems: 3, items: { type: "string" }, description: "2–3 korta teknikpunkter på användarens språk, max ca 6 ord var, t.ex. 'Knäna i linje med tårna'." },
                 },
                 required: ["name", "type", "icon", "locked", "value", "reps", "sets", "tips"],
               },
@@ -73,13 +74,13 @@ Regler för passen:
 - Använd bara övningar som går att göra med den utrustning användaren har.
 - Undvik övningar som belastar skador eller övningar hen vill undvika. Välj säkrare alternativ.
 - Nybörjare: få, grundläggande övningar, 3 set, 8–12 reps. Vana: mer volym och variation.
-- Startvikter: sätt value till null för kg-övningar om användaren inte angett kända lyft. Har hen angett kända lyft, föreslå en försiktig startvikt runt 70–80 % av arbetsvikten, avrundad till 2,5 kg.
+- Startvikter: sätt value till null för kg-övningar om användaren inte angett kända lyft. Har hen angett kända lyft, föreslå en försiktig startvikt runt 70–80 % av arbetsvikten.
 - Kroppsviktsövningar: type bw, value null.
 - Ge varje övning 2–3 korta, konkreta teknikpunkter (tips) som hjälper användaren att utföra den säkert. För uppvärmning räcker 1 punkt.
-- Skriv allt på svenska. Inga medicinska råd; vid skada, föreslå att hen kollar med vårdpersonal i summary.
+- Följ SPRÅK/LANGUAGE och VIKTENHET/WEIGHT UNIT i användarens meddelande. Inga medicinska råd; vid skada, föreslå att hen kollar med vårdpersonal i summary.
 Svara alltid i det angivna JSON-formatet.`;
 
-function clean(input: any) {
+function clean(input: any, unit: "kg" | "lb" | "raw" = "kg") {
   const programs = (Array.isArray(input?.programs) ? input.programs : []).slice(0, 7).map((p: any) => ({
     name: String(p?.name ?? "Pass").slice(0, 40),
     days: [...new Set((Array.isArray(p?.days) ? p.days : []).map(Number).filter((d: number) => Number.isInteger(d) && d >= 0 && d <= 6))],
@@ -91,7 +92,11 @@ function clean(input: any) {
         type,
         icon: ICONS.includes(x?.icon) ? x.icon : "gen",
         locked: !!x?.locked,
-        value: type === "bw" || !isFinite(v) || x?.value === null ? null : Math.round(v * 4) / 4,
+        value: type === "bw" || !isFinite(v) || x?.value === null || x?.value === undefined ? null
+          : unit === "raw" ? v
+          : type === "kg" && unit === "lb" ? Math.round(v / 5) * 5 * KG_PER_LB
+          : type === "kg" ? Math.round(v / 2.5) * 2.5
+          : Math.round(v * 4) / 4,
         reps: type === "time" ? 1 : Math.min(50, Math.max(1, Math.round(Number(x?.reps) || 1))),
         sets: Math.min(10, Math.max(1, Math.round(Number(x?.sets) || 1))),
         tips: (Array.isArray(x?.tips) ? x.tips : []).map((t: unknown) => String(t ?? "").trim().slice(0, 80)).filter(Boolean).slice(0, 3),
@@ -101,6 +106,8 @@ function clean(input: any) {
   return { relevant: input?.relevant !== false, message: String(input?.message ?? "").slice(0, 300), summary: String(input?.summary ?? "").slice(0, 600), programs };
 }
 
+const EXP: Record<string, string> = { beginner: "Nybörjare", some: "Tränat en del", experienced: "Van" };
+const EQUIP: Record<string, string> = { gym: "Fullt gym", home: "Hemmagym", bodyweight: "Bara kroppsvikt" };
 const DAYS = ["söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag"];
 const s = (v: unknown, n = 400) => String(v ?? "").trim().slice(0, n);
 
@@ -179,6 +186,13 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "method" }, 405);
 
+  let body: any = {};
+  try { body = await req.json(); } catch { return json({ error: "Ogiltig förfrågan. / Invalid request." }, 400); }
+  const a = body?.answers ?? {};
+  const en = a.lang === "en";
+  const unit: "kg" | "lb" = a.unit === "lb" ? "lb" : "kg";
+  const T = (sv: string, eng: string) => (en ? eng : sv);
+
   const url = Deno.env.get("SUPABASE_URL")!;
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
@@ -187,33 +201,37 @@ Deno.serve(async (req) => {
 
   const userClient = createClient(url, pub, { global: { headers: { Authorization: authHeader } } });
   const { data: u, error: ue } = await userClient.auth.getUser(token);
-  if (ue || !u?.user) return json({ error: "Du behöver vara inloggad." }, 401);
+  if (ue || !u?.user) return json({ error: T("Du behöver vara inloggad.", "You need to be logged in.") }, 401);
   const uid = u.user.id;
 
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   const claudeKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!geminiKey && !claudeKey) return json({ error: "Coachen är inte aktiverad än. Nyckeln till AI-tjänsten saknas." }, 503);
+  if (!geminiKey && !claudeKey) return json({ error: T("Coachen är inte aktiverad än. Nyckeln till AI-tjänsten saknas.", "The coach isn't set up yet. The AI service key is missing.") }, 503);
 
   const admin = createClient(url, secret, { auth: { persistSession: false } });
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const { count } = await admin.from("coach_usage").select("id", { count: "exact", head: true }).eq("user_id", uid).gte("created_at", since);
-  if ((count ?? 0) >= DAILY_LIMIT) return json({ error: `Du har använt coachen ${DAILY_LIMIT} gånger det senaste dygnet. Försök igen imorgon.`, code: "limit" }, 429);
-
-  let body: any = {};
-  try { body = await req.json(); } catch { return json({ error: "Ogiltig förfrågan." }, 400); }
-  const a = body?.answers ?? {};
+  if ((count ?? 0) >= DAILY_LIMIT) return json({ error: T(`Du har använt coachen ${DAILY_LIMIT} gånger det senaste dygnet. Försök igen imorgon.`, `You've used the coach ${DAILY_LIMIT} times in the last 24 hours. Try again tomorrow.`), code: "limit" }, 429);
   const prefDays = (Array.isArray(a.days) ? a.days : []).filter((d: unknown) => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6);
 
   let msg = `Mål: ${s(a.goal, 600) || "Ej angivet"}
 Pass per vecka: ${Number(a.perWeek) || 3}
 Minuter per pass: ${Number(a.minutes) || 60}
 Föredragna dagar: ${prefDays.length ? prefDays.map((d: number) => DAYS[d]).join(", ") : "Valfritt"}
-Erfarenhet: ${s(a.experience, 60) || "Ej angivet"}
-Utrustning: ${s(a.equipment, 200) || "Fullt gym"}
+Erfarenhet: ${EXP[s(a.experience, 60)] ?? (s(a.experience, 60) || "Ej angivet")}
+Utrustning: ${EQUIP[s(a.equipment, 200)] ?? (s(a.equipment, 200) || "Fullt gym")}
 Skador / undvik: ${s(a.injuries) || "Inget"}
 Kända lyft: ${s(a.lifts) || "Inga angivna"}`;
+  msg += en
+    ? `\n\nLANGUAGE: Write everything the user will read (summary, message, program names, exercise names and tips) in natural American English.`
+    : `\n\nSPRÅK: Skriv allt användaren läser på användarens språk.`;
+  msg += unit === "lb"
+    ? `\nWEIGHT UNIT: Give "value" for kg-type exercises in POUNDS (lb), rounded to the nearest 5 lb. Known lifts above may be given in lb.`
+    : `\nVIKTENHET: Ange "value" för kg-övningar i kilo, avrundat till närmaste 2,5 kg.`;
   if (body?.previous && s(body?.feedback)) {
-    msg += `\n\nDitt förra förslag var:\n${JSON.stringify(clean(body.previous)).slice(0, 6000)}\n\nAnvändarens ändringsönskemål: ${s(body.feedback, 600)}\nGör ett nytt förslag som tar hänsyn till det.`;
+    const prev = clean(body.previous, "raw");
+    if (unit === "lb") prev.programs.forEach((p: any) => p.exercises.forEach((x: any) => { if (x.type === "kg" && x.value != null) x.value = Math.round(x.value / KG_PER_LB); }));
+    msg += `\n\nDitt förra förslag var:\n${JSON.stringify(prev).slice(0, 6000)}\n\nAnvändarens ändringsönskemål: ${s(body.feedback, 600)}\nGör ett nytt förslag som tar hänsyn till det.`;
   }
 
   const { data: usage } = await admin.from("coach_usage").insert({ user_id: uid }).select("id").single();
@@ -226,10 +244,10 @@ Kända lyft: ${s(a.lifts) || "Inga angivna"}`;
     console.error("ai", String(e));
     await refund();
     const busy = /\b(429|500|503)\b|abort/i.test(String(e));
-    return json({ error: busy ? "Coachen har mycket att göra just nu. Vänta en minut och försök igen." : "Coachen svarade inte. Försök igen om en stund." }, 502);
+    return json({ error: busy ? T("Coachen har mycket att göra just nu. Vänta en minut och försök igen.", "The coach is very busy right now. Wait a minute and try again.") : T("Coachen svarade inte. Försök igen om en stund.", "The coach didn't respond. Try again in a moment.") }, 502);
   }
-  const result = clean(raw);
-  if (!result.relevant) return json({ error: result.message || "Jag hjälper bara till med träningspass. Beskriv ditt träningsmål så bygger jag ett förslag.", code: "offtopic" }, 422);
-  if (!result.programs.length) { await refund(); return json({ error: "Coachen kunde inte göra ett förslag. Försök beskriva målet lite tydligare." }, 502); }
+  const result = clean(raw, unit);
+  if (!result.relevant) return json({ error: result.message || T("Jag hjälper bara till med träningspass. Beskriv ditt träningsmål så bygger jag ett förslag.", "I only help with workouts. Describe your training goal and I'll build a plan."), code: "offtopic" }, 422);
+  if (!result.programs.length) { await refund(); return json({ error: T("Coachen kunde inte göra ett förslag. Försök beskriva målet lite tydligare.", "The coach couldn't make a plan. Try describing your goal a bit more clearly.") }, 502); }
   return json({ ...result, remaining: Math.max(0, DAILY_LIMIT - (count ?? 0) - 1) });
 });

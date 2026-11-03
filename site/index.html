@@ -252,6 +252,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline-color:var(
 .tips li::before{content:"";display:inline-block;width:6px;height:6px;background:var(--accent);margin-right:8px;vertical-align:2px}
 .sugg .tipline{display:block;font-size:13px;color:var(--muted);font-family:var(--body);font-weight:400}
 .ex-edit textarea{width:100%;min-height:70px;border:1px solid var(--line-hi);border-radius:var(--r);background:var(--well);color:var(--ink);font:inherit;font-size:15px;padding:8px 10px;resize:vertical}
+.langsw{align-self:flex-end}
+.langsw .chips button{min-height:36px;font-size:14px;padding:0 12px}
 /* leave dialog */
 .modal{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:640px;background:var(--surface);border-top:3px solid var(--accent);padding:20px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px}
@@ -264,7 +266,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline-color:var(
 
 <header class="top"><div class="wrap"><h1><button class="titlebtn" id="title" data-act="title" aria-label="Till startsidan för fliken">Träna</button></h1>
 <button class="burger" id="burger" data-act="menu" aria-expanded="false" aria-controls="menu" aria-label="Meny"><span></span><span></span><span></span></button></div>
-<nav class="menu" id="menu" aria-label="Huvudmeny" hidden><div class="wrap"><div class="menu-in" id="tabs"></div><div class="sync" id="sync">Laddar…</div><div class="account" id="account"></div></div></nav></header>
+<nav class="menu" id="menu" aria-label="Menu" hidden><div class="wrap"><div class="menu-in" id="tabs"></div><div class="sync" id="sync">Laddar…</div><div class="account" id="account"></div></div></nav></header>
 <main id="main" class="wrap"></main>
 <div class="toast" id="toast" hidden></div>
 <div class="modal" id="modal" hidden></div>
@@ -279,9 +281,19 @@ const main = $("#main");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-5);
 const num = v => { if (v === "" || v == null) return null; const n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : null; };
-const fmtNum = n => (Math.round(n * 100) / 100).toString().replace(".", ",");
-const dShort = iso => new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
-const dLong = iso => new Date(iso).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
+/* ---------- language + units ---------- */
+let LANG = "sv", UNIT = "kg";
+const T = (sv, en) => (LANG === "en" ? en : sv);
+const LOC = () => (LANG === "en" ? "en-US" : "sv-SE");
+const KG_PER_LB = 0.45359237; // exact by definition: 1 kg = 2.20462 lb
+const toU = kg => (UNIT === "lb" ? kg / KG_PER_LB : kg);
+const fromU = v => (UNIT === "lb" ? v * KG_PER_LB : v);
+const UL = () => (UNIT === "lb" ? "lb" : "kg");
+const fmtNum = n => { const t = String(Math.round(n * 100) / 100); return LANG === "sv" ? t.replace(".", ",") : t; };
+const fmt1 = n => fmtNum(Math.round(n * 10) / 10);
+const fmtW = kg => fmt1(toU(kg));
+const dShort = iso => new Date(iso).toLocaleDateString(LOC(), { day: "numeric", month: "short" });
+const dLong = iso => new Date(iso).toLocaleDateString(LOC(), { weekday: "long", day: "numeric", month: "long" });
 const clone = o => JSON.parse(JSON.stringify(o));
 
 /* ---------- figures ---------- */
@@ -295,51 +307,56 @@ const ICONS = {
   run: S('<circle cx="14" cy="3.8" r="1.8"/><path d="M13 6.5l-2 6"/><path d="M12.3 8.5l3.7 2M12.3 8.5L8.5 10"/><path d="M11 12.5l3 3-1 3.5M11 12.5L8 15H5"/><path d="M3 21.5h18"/>'),
   gen: S('<path d="M7 12h10"/><rect x="3.5" y="8.5" width="3.5" height="7" rx="1"/><rect x="17" y="8.5" width="3.5" height="7" rx="1"/><path d="M2 12h1.5M20.5 12H22"/>')
 };
-const ICON_NAMES = { press: "Bänk/press", squat: "Knäböj", hinge: "Marklyft", pull: "Rodd/drag", push: "Armhävning", run: "Kondition", gen: "Övrigt" };
-const TYPES = { kg: "Kilo", time: "Tid (min)", bw: "Kroppsvikt" };
+const ICON_NAMES = () => ({ press: T("Bänk/press", "Bench/press"), squat: T("Knäböj", "Squat"), hinge: T("Marklyft", "Deadlift"), pull: T("Rodd/drag", "Row/pull"), push: T("Armhävning", "Push-up"), run: T("Kondition", "Cardio"), gen: T("Övrigt", "Other") });
+const TYPES = () => ({ kg: T("Vikt", "Weight"), time: T("Tid (min)", "Time (min)"), bw: T("Kroppsvikt", "Bodyweight") });
 const TAB_ICONS = {
   trana: S('<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>'),
   program: S('<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>'),
   historik: S('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
-  progression: S('<path d="M3.5 20.5h17"/><path d="M5 16l5-5 3.5 3L20 7.5"/><path d="M15.5 7.5H20V12"/>')
+  progression: S('<path d="M3.5 20.5h17"/><path d="M5 16l5-5 3.5 3L20 7.5"/><path d="M15.5 7.5H20V12"/>'),
+  installningar: S('<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>')
 };
-const TABS = [["trana", "Träna"], ["program", "Program"], ["historik", "Historik"], ["progression", "Progression"]];
+const TABS = () => [["trana", T("Träna", "Train")], ["program", T("Program", "Programs")], ["historik", T("Historik", "History")], ["progression", T("Progression", "Progress")], ["installningar", T("Inställningar", "Settings")]];
 
 /* ---------- formatting a logged exercise ---------- */
 function fmtEntry(e) {
   const parts = [];
-  if (e.type === "kg" && e.value != null) parts.push(fmtNum(e.value) + " kg");
+  if (e.type === "kg" && e.value != null) parts.push(fmtW(e.value) + " " + UL());
   if (e.type === "time" && e.value != null) parts.push(fmtNum(e.value) + " min");
   const reps = e.reps || 1, sets = e.sets || 1;
   let rs = "";
   if (reps > 1 && sets > 1) rs = sets + "×" + reps;
   else if (reps > 1) rs = reps + " reps";
-  else if (sets > 1) rs = sets + " set";
-  if (e.type === "bw") parts.push(rs ? rs + " (kroppsvikt)" : "Kroppsvikt");
+  else if (sets > 1) rs = sets + T(" set", " sets");
+  if (e.type === "bw") parts.push(rs ? rs + T(" (kroppsvikt)", " (bodyweight)") : T("Kroppsvikt", "Bodyweight"));
   else if (rs) parts.push(rs);
   return parts.join(" · ") || "–";
 }
 const LOCK = S('<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>');
 const UNLOCK = S('<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.6-1.8"/>');
+function exValue(x) { // kg for weight exercises, minutes for time, even while an edit is pending
+  if (x.vin != null) { const n = num(x.vin); return n == null ? null : x.type === "kg" ? fromU(n) : n; }
+  return num(x.value);
+}
 function planText(x) {
-  const e = { type: x.type, value: num(x.value), reps: num(x.reps) || 1, sets: num(x.sets) || 1 };
+  const e = { type: x.type, value: exValue(x), reps: num(x.reps) || 1, sets: num(x.sets) || 1 };
   if (e.type === "time") e.reps = 1;
   const t = fmtEntry(e);
-  return t === "–" ? TYPES[x.type] : t;
+  return t === "–" ? TYPES()[x.type] : t;
 }
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
-const DAY_SHORT = ["Sö", "Må", "Ti", "On", "To", "Fr", "Lö"];
-const DAY_LONG = ["söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag"];
-const daysText = p => (p.days || []).length === 7 ? "Varje dag" : DAY_ORDER.filter(d => (p.days || []).includes(d)).map(d => DAY_SHORT[d]).join(" · ");
+const DAY_SHORT = () => LANG === "en" ? ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] : ["Sö", "Må", "Ti", "On", "To", "Fr", "Lö"];
+const DAY_LONG = () => LANG === "en" ? ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] : ["söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag"];
+const daysText = p => (p.days || []).length === 7 ? T("Varje dag", "Every day") : DAY_ORDER.filter(d => (p.days || []).includes(d)).map(d => DAY_SHORT()[d]).join(" · ");
 const PLAY = S('<path d="M8 5.5v13l10.5-6.5z"/>');
-const videoUrl = n => "https://www.youtube.com/results?search_query=" + encodeURIComponent(n.trim() + " teknik");
+const videoUrl = n => "https://www.youtube.com/results?search_query=" + encodeURIComponent(n.trim() + T(" teknik", " technique"));
 function tipsFor(e) {
   const p = state.programs.find(q => q.id === (state.active && state.active.programId));
   const x = p && p.exercises.find(y => y.id === e.exId);
   return (x && Array.isArray(x.tips)) ? x.tips.filter(Boolean) : [];
 }
-const metric = e => e.type === "bw" ? (e.reps || 0) : (e.value || 0);
-const metricUnit = t => t === "kg" ? "kg" : t === "time" ? "min" : "reps";
+const metric = e => e.type === "bw" ? (e.reps || 0) : e.type === "kg" ? toU(e.value || 0) : (e.value || 0);
+const metricUnit = t => t === "kg" ? UL() : t === "time" ? "min" : "reps";
 
 /* ---------- state ---------- */
 const SB_URL = "https://kxlshlhqrakmeejejcnk.supabase.co";
@@ -436,21 +453,43 @@ window.addEventListener("online", () => { Store.flush().then(() => Store.pull())
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Store.uid && navigator.onLine) Store.flush(); });
 function setSync() {
   const n = Store.uid ? Store.outbox().length : 0;
-  $("#sync").textContent = !Store.uid ? "" : n ? `Offline · ${n} ${n === 1 ? "ändring" : "ändringar"} synkas när du får nät` : Store.synced ? "Sparas i ditt konto" : navigator.onLine ? "Synkar…" : "Offline · visar sparad data";
+  $("#sync").textContent = !Store.uid ? "" : n ? T(`Offline · ${n} ${n === 1 ? "ändring" : "ändringar"} synkas när du får nät`, `Offline · ${n} ${n === 1 ? "change" : "changes"} will sync when you're online`) : Store.synced ? T("Sparas i ditt konto", "Saved to your account") : navigator.onLine ? T("Synkar…", "Syncing…") : T("Offline · visar sparad data", "Offline · showing saved data");
 }
 
 /* ---------- login ---------- */
-const AUTH_ERR = [
-  [/invalid login credentials/i, "Fel e-post eller lösenord."],
-  [/email not confirmed/i, "Bekräfta din e-post först. Kolla inkorgen och klicka på länken."],
-  [/already registered|already exists/i, "Det finns redan ett konto med den e-posten. Logga in istället."],
-  [/password should be at least|weak password/i, "Lösenordet måste vara minst 6 tecken."],
-  [/provider is not enabled|unsupported provider/i, "Google-inloggning är inte aktiverad än."],
-  [/rate limit|too many/i, "För många försök just nu. Vänta en stund och försök igen."],
-  [/invalid email|unable to validate email/i, "Kontrollera e-postadressen."],
-  [/fetch|network/i, "Ingen kontakt med servern. Kolla din internetanslutning."]
+const AUTH_ERR = () => [
+  [/invalid login credentials/i, T("Fel e-post eller lösenord.", "Wrong email or password.")],
+  [/email not confirmed/i, T("Bekräfta din e-post först. Kolla inkorgen och klicka på länken.", "Confirm your email first. Check your inbox and click the link.")],
+  [/already registered|already exists/i, T("Det finns redan ett konto med den e-posten. Logga in istället.", "There's already an account with that email. Log in instead.")],
+  [/password should be at least|weak password/i, T("Lösenordet måste vara minst 6 tecken.", "The password must be at least 6 characters.")],
+  [/provider is not enabled|unsupported provider/i, T("Google-inloggning är inte aktiverad än.", "Google sign-in isn't enabled yet.")],
+  [/rate limit|too many/i, T("För många försök just nu. Vänta en stund och försök igen.", "Too many attempts right now. Wait a moment and try again.")],
+  [/invalid email|unable to validate email/i, T("Kontrollera e-postadressen.", "Check the email address.")],
+  [/fetch|network/i, T("Ingen kontakt med servern. Kolla din internetanslutning.", "Can't reach the server. Check your internet connection.")]
 ];
-const authErr = e => { const m = (e && e.message) || ""; for (const [re, t] of AUTH_ERR) if (re.test(m)) return t; return "Något gick fel. Försök igen."; };
+const authErr = e => { const m = (e && e.message) || ""; for (const [re, t] of AUTH_ERR()) if (re.test(m)) return t; return T("Något gick fel. Försök igen.", "Something went wrong. Try again."); };
+
+/* ---------- settings: language + weight unit ---------- */
+const Settings = {
+  device() {
+    const l = (navigator.language || "en").toLowerCase();
+    return { lang: l.startsWith("sv") ? "sv" : "en", unit: /-(us|lr|mm)$/.test(l) ? "lb" : "kg" };
+  },
+  apply(st) {
+    LANG = st.lang === "en" ? "en" : "sv"; UNIT = st.unit === "lb" ? "lb" : "kg";
+    document.documentElement.lang = LANG;
+    try { localStorage.setItem("gymloggen-lang", LANG); } catch (_) {}
+  },
+  async save(patch) {
+    const cur = Object.assign({ lang: LANG, unit: UNIT }, patch);
+    this.apply(cur);
+    if (Store.uid && state.user) {
+      Store.set("settings", cur);
+      try { await sb.from("profiles").upsert({ id: state.user.id, lang: cur.lang, unit: cur.unit }); } catch (_) {}
+    }
+  }
+};
+(() => { const d = Settings.device(); let l = null; try { l = localStorage.getItem("gymloggen-lang"); } catch (_) {} Settings.apply({ lang: l || d.lang, unit: d.unit }); })();
 const redirectTo = () => location.origin + location.pathname;
 const Auth = {
   async init() {
@@ -474,8 +513,15 @@ const Auth = {
     state.screen = "loading"; render(true);
     await Store.start(user.id);
     let onboarded = Store.get("onboarded", null);
-    if (onboarded === null && !offline) {
-      try { const { data } = await sb.from("profiles").select("onboarded").eq("id", user.id).maybeSingle(); onboarded = !!(data && data.onboarded); } catch (_) { onboarded = false; }
+    let st = Store.get("settings", null);
+    if (st) Settings.apply(st);
+    if (!offline) {
+      try {
+        const { data } = await sb.from("profiles").select("onboarded,lang,unit").eq("id", user.id).maybeSingle();
+        if (onboarded === null) onboarded = !!(data && data.onboarded);
+        if (data && data.lang && data.unit) { st = { lang: data.lang, unit: data.unit }; Settings.apply(st); Store.set("settings", st); }
+        else Settings.save(st || { lang: LANG, unit: UNIT });
+      } catch (_) { if (onboarded === null) onboarded = false; }
       if (onboarded) Store.set("onboarded", true);
     }
     state.legacy = null;
@@ -491,7 +537,7 @@ const Auth = {
     try { await sb.from("profiles").upsert({ id: state.user.id, onboarded: true }); } catch (_) {}
   },
   async logout() {
-    if (Store.outbox().length) { toast("Vänta tills allt är synkat innan du loggar ut."); Store.flush(); return; }
+    if (Store.outbox().length) { toast(T("Vänta tills allt är synkat innan du loggar ut.", "Wait until everything has synced before logging out.")); Store.flush(); return; }
     try { await sb.auth.signOut(); } catch (_) {}
     try { localStorage.removeItem("gymloggen-lastuser"); } catch (_) {}
     Object.assign(state, { user: null, programs: [], sessions: [], active: null, editing: null, menu: false, screen: "auth", authMode: "in", authMsg: null, view: "trana" });
@@ -500,23 +546,23 @@ const Auth = {
 };
 
 /* ---------- coach ---------- */
-const newCoach = from => ({ from, step: "form", answers: { goal: "", perWeek: 3, minutes: 60, days: [], experience: "Nybörjare", equipment: "Fullt gym", injuries: "", lifts: "" }, result: null, feedback: "", showFeedback: false, error: null, remaining: null });
+const newCoach = from => ({ from, step: "form", answers: { goal: "", perWeek: 3, minutes: 60, days: [], experience: "beginner", equipment: "gym", injuries: "", lifts: "" }, result: null, feedback: "", showFeedback: false, error: null, remaining: null });
 async function runCoach(withFeedback) {
   const c = state.coach;
-  if (!c.answers.goal.trim()) { toast("Beskriv ditt mål först."); return; }
-  if (!navigator.onLine) { toast("Du behöver internet för att använda coachen."); return; }
-  const body = { answers: c.answers };
-  if (withFeedback) { if (!c.feedback.trim()) { toast("Skriv vad du vill ändra."); return; } body.previous = c.result; body.feedback = c.feedback; }
+  if (!c.answers.goal.trim()) { toast(T("Beskriv ditt mål först.", "Describe your goal first.")); return; }
+  if (!navigator.onLine) { toast(T("Du behöver internet för att använda coachen.", "You need internet to use the coach.")); return; }
+  const body = { answers: Object.assign({}, c.answers, { lang: LANG, unit: UNIT }) };
+  if (withFeedback) { if (!c.feedback.trim()) { toast(T("Skriv vad du vill ändra.", "Write what you want to change.")); return; } body.previous = c.result; body.feedback = c.feedback; }
   c.step = "loading"; c.error = null; render(true); window.scrollTo(0, 0);
   try {
     const { data, error } = await sb.functions.invoke("coach", { body });
     if (error) {
-      let msg = "Coachen svarade inte. Försök igen om en stund.";
+      let msg = T("Coachen svarade inte. Försök igen om en stund.", "The coach didn't respond. Try again in a moment.");
       try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (_) {}
       throw new Error(msg);
     }
     c.result = data; c.remaining = data.remaining; c.feedback = ""; c.showFeedback = false; c.step = "result";
-  } catch (e) { c.error = e.message || "Något gick fel."; c.step = c.result ? "result" : "form"; }
+  } catch (e) { c.error = e.message || T("Något gick fel.", "Something went wrong."); c.step = c.result ? "result" : "form"; }
   render(true); window.scrollTo(0, 0);
 }
 function saveCoach() {
@@ -525,7 +571,7 @@ function saveCoach() {
   Store.savePrograms(state.programs.concat(add));
   Auth.markOnboarded();
   state.coach = null; state.screen = "app"; state.view = "trana";
-  toast(add.length === 1 ? "1 pass sparat" : add.length + " pass sparade");
+  toast(add.length === 1 ? T("1 pass sparat", "1 workout saved") : add.length + T(" pass sparade", " workouts saved"));
   try { history.replaceState(null, "", "#trana"); } catch (_) {}
   render(true); window.scrollTo(0, 0);
 }
@@ -533,43 +579,46 @@ function saveCoach() {
 /* ---------- screens before the app ---------- */
 const GOOGLE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.5-.2-2.3H12v4.3h6a5.1 5.1 0 0 1-2.2 3.4v2.8h3.6c2.1-2 3.2-4.8 3.2-8.2z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.4-2.7l-3.6-2.8c-1 .7-2.3 1.1-3.8 1.1-2.9 0-5.4-2-6.3-4.6H2v2.9A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.7 14c-.2-.7-.4-1.3-.4-2s.2-1.4.4-2V7.1H2A11 11 0 0 0 1 12c0 1.8.4 3.5 1.2 4.9l3.5-2.9z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2 7.1l3.7 2.9c.9-2.6 3.4-4.6 6.3-4.6z"/></svg>';
 const msgBox = m => m ? `<div class="msg${m.err ? " err" : ""}" role="${m.err ? "alert" : "status"}">${esc(m.text)}</div>` : "";
+function seg(act, opts, val) { return `<div class="chips" role="group">${opts.map(([v, l]) => `<button type="button" data-act="${act}" data-v="${esc(v)}" aria-pressed="${String(val) === String(v)}">${esc(l)}</button>`).join("")}</div>`; }
+const langSwitch = () => `<div class="langsw">${seg("setLang", [["sv", "Svenska"], ["en", "English"]], LANG)}</div>`;
 function vScreen() {
   const sc = state.screen;
-  if (sc === "loading") return `<div class="screen"><div class="loadbar"></div><p class="muted">Hämtar dina pass…</p></div>`;
-  if (sc === "nolib") return `<div class="screen"><p class="lead">Ingen kontakt</p><p class="muted">Appen behöver internet första gången du loggar in. Anslut och ladda om sidan.</p><button class="btn primary" data-act="reload">Försök igen</button></div>`;
+  if (sc === "loading") return `<div class="screen"><div class="loadbar"></div><p class="muted">${T("Hämtar dina pass…", "Loading your workouts…")}</p></div>`;
+  if (sc === "nolib") return `<div class="screen"><p class="lead">${T("Ingen kontakt", "No connection")}</p><p class="muted">${T("Appen behöver internet första gången du loggar in. Anslut och ladda om sidan.", "The app needs internet the first time you log in. Connect and reload the page.")}</p><button class="btn primary" data-act="reload">${T("Försök igen", "Try again")}</button></div>`;
   if (sc === "auth") {
     const m = state.authMode, b = state.busy;
-    const head = m === "up" ? "Skapa <em>konto</em>" : m === "reset" ? "Nytt <em>lösenord</em>" : "Logga <em>in</em>";
+    const head = m === "up" ? T("Skapa <em>konto</em>", "Create <em>account</em>") : m === "reset" ? T("Nytt <em>lösenord</em>", "New <em>password</em>") : T("Logga <em>in</em>", "Log <em>in</em>");
     return `<div class="screen">
+      ${langSwitch()}
       <p class="lead">${head}</p>
-      <p class="muted">${m === "reset" ? "Skriv din e-post så skickar vi en länk där du väljer ett nytt lösenord." : "Dina program och pass sparas i ditt konto, så du kommer åt dem från vilken enhet som helst."}</p>
+      <p class="muted">${m === "reset" ? T("Skriv din e-post så skickar vi en länk där du väljer ett nytt lösenord.", "Enter your email and we'll send a link where you choose a new password.") : T("Dina program och pass sparas i ditt konto, så du kommer åt dem från vilken enhet som helst.", "Your programs and workouts are saved to your account, so you can reach them from any device.")}</p>
       ${msgBox(state.authMsg)}
-      ${m !== "reset" ? `<button class="btn google wide" data-act="google"${b ? " disabled" : ""}>${GOOGLE}<span>Fortsätt med Google</span></button><div class="divider">eller med e-post</div>` : ""}
+      ${m !== "reset" ? `<button class="btn google wide" data-act="google"${b ? " disabled" : ""}>${GOOGLE}<span>${T("Fortsätt med Google", "Continue with Google")}</span></button><div class="divider">${T("eller med e-post", "or with email")}</div>` : ""}
       <form class="form" id="authform" novalidate>
-        <div class="field"><label for="au-email">E-post</label><input id="au-email" type="email" autocomplete="email" inputmode="email" required value="${esc(state.authEmail || "")}"></div>
-        ${m !== "reset" ? `<div class="field"><label for="au-pass">Lösenord${m === "up" ? ` <span class="opt">(minst 6 tecken)</span>` : ""}</label><input id="au-pass" type="password" autocomplete="${m === "up" ? "new-password" : "current-password"}" required></div>` : ""}
-        <button class="btn primary wide" type="submit"${b ? " disabled" : ""}>${b ? "Vänta…" : m === "up" ? "Skapa konto" : m === "reset" ? "Skicka länk" : "Logga in"}</button>
+        <div class="field"><label for="au-email">${T("E-post", "Email")}</label><input id="au-email" type="email" autocomplete="email" inputmode="email" required value="${esc(state.authEmail || "")}"></div>
+        ${m !== "reset" ? `<div class="field"><label for="au-pass">${T("Lösenord", "Password")}${m === "up" ? ` <span class="opt">${T("(minst 6 tecken)", "(at least 6 characters)")}</span>` : ""}</label><input id="au-pass" type="password" autocomplete="${m === "up" ? "new-password" : "current-password"}" required></div>` : ""}
+        <button class="btn primary wide" type="submit"${b ? " disabled" : ""}>${b ? T("Vänta…", "Please wait…") : m === "up" ? T("Skapa konto", "Create account") : m === "reset" ? T("Skicka länk", "Send link") : T("Logga in", "Log in")}</button>
       </form>
-      ${m === "in" ? `<button class="linkbtn" data-act="authMode" data-v="reset">Glömt lösenordet?</button>` : ""}
-      <div class="divider">${m === "up" ? "Har du redan ett konto?" : m === "reset" ? "Kom du ihåg det?" : "Ny här?"}</div>
-      <button class="btn wide" data-act="authMode" data-v="${m === "in" ? "up" : "in"}">${m === "in" ? "Skapa konto" : "Logga in"}</button>
+      ${m === "in" ? `<button class="linkbtn" data-act="authMode" data-v="reset">${T("Glömt lösenordet?", "Forgot your password?")}</button>` : ""}
+      <div class="divider">${m === "up" ? T("Har du redan ett konto?", "Already have an account?") : m === "reset" ? T("Kom du ihåg det?", "Remembered it?") : T("Ny här?", "New here?")}</div>
+      <button class="btn wide" data-act="authMode" data-v="${m === "in" ? "up" : "in"}">${m === "in" ? T("Skapa konto", "Create account") : T("Logga in", "Log in")}</button>
     </div>`;
   }
-  if (sc === "recover") return `<div class="screen"><p class="lead">Välj nytt <em>lösenord</em></p>${msgBox(state.authMsg)}
-      <form class="form" id="recoverform" novalidate><div class="field"><label for="au-new">Nytt lösenord <span class="opt">(minst 6 tecken)</span></label><input id="au-new" type="password" autocomplete="new-password" required></div>
-      <button class="btn primary wide" type="submit"${state.busy ? " disabled" : ""}>Spara lösenordet</button></form></div>`;
+  if (sc === "recover") return `<div class="screen"><p class="lead">${T("Välj nytt <em>lösenord</em>", "Choose a new <em>password</em>")}</p>${msgBox(state.authMsg)}
+      <form class="form" id="recoverform" novalidate><div class="field"><label for="au-new">${T("Nytt lösenord", "New password")} <span class="opt">${T("(minst 6 tecken)", "(at least 6 characters)")}</span></label><input id="au-new" type="password" autocomplete="new-password" required></div>
+      <button class="btn primary wide" type="submit"${state.busy ? " disabled" : ""}>${T("Spara lösenordet", "Save password")}</button></form></div>`;
   if (sc === "import") {
-    const L = state.legacy;
-    return `<div class="screen"><p class="lead">Flytta din <em>data</em>?</p>
-      <p>Vi hittade <b>${(L.programs || []).length} program</b> och <b>${(L.sessions || []).length} pass</b> sparade i den här telefonen från den tidigare versionen av appen.</p>
-      <p class="muted">Flyttar du dem hamnar de i ditt konto och syns på alla dina enheter.</p>
-      <button class="btn primary wide" data-act="importLegacy">Flytta till mitt konto</button>
-      <button class="btn wide" data-act="skipLegacy">Börja från noll</button></div>`;
+    const L = state.legacy, np = (L.programs || []).length, ns = (L.sessions || []).length;
+    return `<div class="screen"><p class="lead">${T("Flytta din <em>data</em>?", "Move your <em>data</em>?")}</p>
+      <p>${T(`Vi hittade <b>${np} program</b> och <b>${ns} pass</b> sparade i den här telefonen från den tidigare versionen av appen.`, `We found <b>${np} ${np === 1 ? "program" : "programs"}</b> and <b>${ns} ${ns === 1 ? "workout" : "workouts"}</b> saved on this phone from the earlier version of the app.`)}</p>
+      <p class="muted">${T("Flyttar du dem hamnar de i ditt konto och syns på alla dina enheter.", "If you move them, they go into your account and show up on all your devices.")}</p>
+      <button class="btn primary wide" data-act="importLegacy">${T("Flytta till mitt konto", "Move to my account")}</button>
+      <button class="btn wide" data-act="skipLegacy">${T("Börja från noll", "Start from scratch")}</button></div>`;
   }
-  if (sc === "onboard") return `<div class="screen"><p class="lead">Vill du ha hjälp att <em>bygga pass</em>?</p>
-      <p class="muted">Beskriv kort dina mål och hur mycket du vill träna, så bygger AI-coachen ett förslag. Du godkänner eller ändrar innan något sparas.</p>
-      <button class="btn primary wide" data-act="coachStart">Ja, hjälp mig</button>
-      <button class="btn wide" data-act="skipOnboard">Nej, gå till appen</button></div>`;
+  if (sc === "onboard") return `<div class="screen"><p class="lead">${T("Vill du ha hjälp att <em>bygga pass</em>?", "Want help <em>building workouts</em>?")}</p>
+      <p class="muted">${T("Beskriv kort dina mål och hur mycket du vill träna, så bygger AI-coachen ett förslag. Du godkänner eller ändrar innan något sparas.", "Briefly describe your goals and how much you want to train, and the AI coach builds a plan. You approve or change it before anything is saved.")}</p>
+      <button class="btn primary wide" data-act="coachStart">${T("Ja, hjälp mig", "Yes, help me")}</button>
+      <button class="btn wide" data-act="skipOnboard">${T("Nej, gå till appen", "No, go to the app")}</button></div>`;
   if (sc === "coach") return vCoach();
   return "";
 }
@@ -577,34 +626,35 @@ function chips(key, opts, val) { return `<div class="chips" role="group">${opts.
 function vCoach() {
   const c = state.coach, a = c.answers;
   const err = c.error ? msgBox({ err: true, text: c.error }) : "";
-  if (c.step === "loading") return `<div class="screen"><p class="lead">Coachen bygger dina <em>pass</em></p><div class="loadbar"></div><p class="muted">Det tar oftast 10–30 sekunder.</p></div>`;
+  const cancel = c.from === "onboard" ? T("Hoppa över och gå till appen", "Skip and go to the app") : T("Avbryt", "Cancel");
+  if (c.step === "loading") return `<div class="screen"><p class="lead">${T("Coachen bygger dina <em>pass</em>", "The coach is building your <em>workouts</em>")}</p><div class="loadbar"></div><p class="muted">${T("Det tar oftast 10–30 sekunder.", "This usually takes 10–30 seconds.")}</p></div>`;
   if (c.step === "result") {
     const r = c.result;
-    return `<div class="screen"><p class="lead">Ditt <em>förslag</em></p>${err}
+    return `<div class="screen"><p class="lead">${T("Ditt <em>förslag</em>", "Your <em>plan</em>")}</p>${err}
       ${r.summary ? `<p class="summary">${esc(r.summary)}</p>` : ""}
       ${r.programs.map(p => `<div class="card sugg"><div class="prog-name">${esc(p.name)}</div>${daysText(p) ? `<div class="muted small">${daysText(p)}</div>` : ""}
         <ul>${p.exercises.map(x => `<li><span>${esc(x.name)}${(x.tips || []).length ? `<span class="tipline">${esc(x.tips.join(" · "))}</span>` : ""}</span><span>${esc(planText(x))}${x.locked ? LOCK : ""}</span></li>`).join("")}</ul></div>`).join("")}
-      <p class="muted small">Tomma vikter fyller du i första gången du kör passet.</p>
-      <button class="btn primary wide" data-act="coachSave">Spara ${r.programs.length === 1 ? "passet" : "passen"}</button>
-      ${c.showFeedback ? `<div class="form"><div class="field"><label for="c-feedback">Vad vill du ändra?</label><textarea id="c-feedback" data-c="feedback" placeholder="T.ex. byt marklyft mot något skonsammare för ryggen">${esc(c.feedback)}</textarea></div>
-        <button class="btn wide" data-act="coachRedo">Gör nytt förslag</button></div>`
-        : `<button class="btn wide" data-act="coachFeedback">Ändra något</button>`}
-      ${c.remaining != null ? `<p class="muted small">${c.remaining} ${c.remaining === 1 ? "förslag" : "förslag"} kvar idag.</p>` : ""}
-      <button class="linkbtn" data-act="coachCancel">${c.from === "onboard" ? "Hoppa över och gå till appen" : "Avbryt"}</button></div>`;
+      <p class="muted small">${T("Tomma vikter fyller du i första gången du kör passet.", "You fill in missing weights the first time you do the workout.")}</p>
+      <button class="btn primary wide" data-act="coachSave">${r.programs.length === 1 ? T("Spara passet", "Save workout") : T("Spara passen", "Save workouts")}</button>
+      ${c.showFeedback ? `<div class="form"><div class="field"><label for="c-feedback">${T("Vad vill du ändra?", "What do you want to change?")}</label><textarea id="c-feedback" data-c="feedback" placeholder="${T("T.ex. byt marklyft mot något skonsammare för ryggen", "E.g. swap deadlifts for something easier on my back")}">${esc(c.feedback)}</textarea></div>
+        <button class="btn wide" data-act="coachRedo">${T("Gör nytt förslag", "Make a new plan")}</button></div>`
+        : `<button class="btn wide" data-act="coachFeedback">${T("Ändra något", "Change something")}</button>`}
+      ${c.remaining != null ? `<p class="muted small">${T(`${c.remaining} förslag kvar idag.`, `${c.remaining} ${c.remaining === 1 ? "plan" : "plans"} left today.`)}</p>` : ""}
+      <button class="linkbtn" data-act="coachCancel">${cancel}</button></div>`;
   }
-  return `<div class="screen"><p class="lead">Berätta för <em>coachen</em></p>${err}
+  return `<div class="screen"><p class="lead">${T("Berätta för <em>coachen</em>", "Tell the <em>coach</em>")}</p>${err}
     <div class="form">
-      <div class="field"><label for="c-goal">Ditt mål</label><textarea id="c-goal" data-c="goal" placeholder="T.ex. bli starkare i benen och gå ner lite i vikt">${esc(a.goal)}</textarea></div>
-      <div class="field"><span class="flabel">Pass per vecka</span>${chips("perWeek", [1, 2, 3, 4, 5, 6], a.perWeek)}</div>
-      <div class="field"><span class="flabel">Minuter per pass</span>${chips("minutes", [30, 45, 60, 75, 90], a.minutes)}</div>
-      <div class="field"><span class="flabel">Dagar du helst tränar <span class="opt">(valfritt)</span></span><div class="days" role="group" aria-label="Veckodagar">
-        ${DAY_ORDER.map(d => `<button type="button" data-act="cday" data-v="${d}" aria-pressed="${a.days.includes(d)}" aria-label="${DAY_LONG[d]}">${DAY_SHORT[d]}</button>`).join("")}</div></div>
-      <div class="field"><span class="flabel">Erfarenhet</span>${chips("experience", ["Nybörjare", "Tränat en del", "Van"], a.experience)}</div>
-      <div class="field"><span class="flabel">Utrustning</span>${chips("equipment", ["Fullt gym", "Hemmagym", "Bara kroppsvikt"], a.equipment)}</div>
-      <div class="field"><label for="c-injuries">Skador eller övningar att undvika <span class="opt">(valfritt)</span></label><input id="c-injuries" type="text" data-c="injuries" value="${esc(a.injuries)}" placeholder="T.ex. ont i axeln"></div>
-      <div class="field"><label for="c-lifts">Lyft du kan <span class="opt">(valfritt)</span></label><input id="c-lifts" type="text" data-c="lifts" value="${esc(a.lifts)}" placeholder="T.ex. knäböj 80 kg × 8, bänk 60 kg × 8"></div>
-      <button class="btn primary wide" data-act="coachRun">Bygg mina pass</button>
-      <button class="linkbtn" data-act="coachCancel">${c.from === "onboard" ? "Hoppa över och gå till appen" : "Avbryt"}</button>
+      <div class="field"><label for="c-goal">${T("Ditt mål", "Your goal")}</label><textarea id="c-goal" data-c="goal" placeholder="${T("T.ex. bli starkare i benen och gå ner lite i vikt", "E.g. get stronger legs and lose a little weight")}">${esc(a.goal)}</textarea></div>
+      <div class="field"><span class="flabel">${T("Pass per vecka", "Workouts per week")}</span>${chips("perWeek", [1, 2, 3, 4, 5, 6], a.perWeek)}</div>
+      <div class="field"><span class="flabel">${T("Minuter per pass", "Minutes per workout")}</span>${chips("minutes", [30, 45, 60, 75, 90], a.minutes)}</div>
+      <div class="field"><span class="flabel">${T("Dagar du helst tränar", "Days you prefer to train")} <span class="opt">${T("(valfritt)", "(optional)")}</span></span><div class="days" role="group" aria-label="${T("Veckodagar", "Weekdays")}">
+        ${DAY_ORDER.map(d => `<button type="button" data-act="cday" data-v="${d}" aria-pressed="${a.days.includes(d)}" aria-label="${DAY_LONG()[d]}">${DAY_SHORT()[d]}</button>`).join("")}</div></div>
+      <div class="field"><span class="flabel">${T("Erfarenhet", "Experience")}</span>${chips("experience", [["beginner", T("Nybörjare", "Beginner")], ["some", T("Tränat en del", "Some experience")], ["experienced", T("Van", "Experienced")]], a.experience)}</div>
+      <div class="field"><span class="flabel">${T("Utrustning", "Equipment")}</span>${chips("equipment", [["gym", T("Fullt gym", "Full gym")], ["home", T("Hemmagym", "Home gym")], ["bodyweight", T("Bara kroppsvikt", "Bodyweight only")]], a.equipment)}</div>
+      <div class="field"><label for="c-injuries">${T("Skador eller övningar att undvika", "Injuries or exercises to avoid")} <span class="opt">${T("(valfritt)", "(optional)")}</span></label><input id="c-injuries" type="text" data-c="injuries" value="${esc(a.injuries)}" placeholder="${T("T.ex. ont i axeln", "E.g. sore shoulder")}"></div>
+      <div class="field"><label for="c-lifts">${T("Lyft du kan", "Lifts you know")} <span class="opt">${T("(valfritt)", "(optional)")}</span></label><input id="c-lifts" type="text" data-c="lifts" value="${esc(a.lifts)}" placeholder="${UNIT === "lb" ? T("T.ex. knäböj 185 lb × 8, bänk 135 lb × 8", "E.g. squat 185 lb × 8, bench 135 lb × 8") : T("T.ex. knäböj 80 kg × 8, bänk 60 kg × 8", "E.g. squat 80 kg × 8, bench 60 kg × 8")}"></div>
+      <button class="btn primary wide" data-act="coachRun">${T("Bygg mina pass", "Build my workouts")}</button>
+      <button class="linkbtn" data-act="coachCancel">${cancel}</button>
     </div></div>`;
 }
 
@@ -624,141 +674,143 @@ function lastFor(exId, name) {
 /* ---------- views ---------- */
 function vTrain() {
   if (state.active && !state.active.paused) return vActive();
-  if (!state.loaded) return `<div class="card empty"><p class="muted">Hämtar dina program…</p></div>`;
+  if (!state.loaded) return `<div class="card empty"><p class="muted">${T("Hämtar dina program…", "Loading your programs…")}</p></div>`;
   if (!state.programs.length) return `<div class="card empty">${ICONS.gen.replace("<svg", '<svg width="40" height="40" style="color:var(--accent)"')}
-    <p><b>Inga program än.</b></p><p class="muted">Bygg ditt första pass med övningar, så kan du starta det här.</p>
-    <button class="btn primary" data-act="newProgram">Bygg mitt program</button></div>`;
+    <p><b>${T("Inga program än.", "No programs yet.")}</b></p><p class="muted">${T("Bygg ditt första pass med övningar, så kan du starta det här.", "Build your first workout with exercises, then start it here.")}</p>
+    <button class="btn primary" data-act="newProgram">${T("Bygg mitt program", "Build my program")}</button></div>`;
   const last = state.sessions[0];
   const d = state.active;
-  const paused = d ? `<section class="section"><h2>Utkast</h2><div class="card prog">
-      <div class="prog-top"><div><div class="prog-name">${esc(d.programName)}</div><div class="muted small">Påbörjat ${dLong(d.startedAt)}</div></div>
-      <button class="btn primary" data-act="resume">Fortsätt</button></div>
-      ${state.confirm === "dropDraft" ? `<div class="btnrow"><button class="btn danger" data-act="dropDraftYes">Ja, släng utkastet</button><button class="btn" data-act="confirmNo">Behåll</button></div>`
-        : `<div class="btnrow"><button class="btn danger sm" data-act="dropDraft">Släng utkastet</button></div>`}
-      <div class="muted small">Startar du ett nytt pass ersätts utkastet.</div></div></section>` : "";
+  const paused = d ? `<section class="section"><h2>${T("Utkast", "Draft")}</h2><div class="card prog">
+      <div class="prog-top"><div><div class="prog-name">${esc(d.programName)}</div><div class="muted small">${T("Påbörjat", "Started")} ${dLong(d.startedAt)}</div></div>
+      <button class="btn primary" data-act="resume">${T("Fortsätt", "Resume")}</button></div>
+      ${state.confirm === "dropDraft" ? `<div class="btnrow"><button class="btn danger" data-act="dropDraftYes">${T("Ja, släng utkastet", "Yes, discard draft")}</button><button class="btn" data-act="confirmNo">${T("Behåll", "Keep")}</button></div>`
+        : `<div class="btnrow"><button class="btn danger sm" data-act="dropDraft">${T("Släng utkastet", "Discard draft")}</button></div>`}
+      <div class="muted small">${T("Startar du ett nytt pass ersätts utkastet.", "Starting a new workout replaces the draft.")}</div></div></section>` : "";
   const today = new Date().getDay();
   const rec = state.programs.filter(p => (p.days || []).includes(today));
   const rest = state.programs.filter(p => !(p.days || []).includes(today));
   const card = (p, primary) => `<div class="card prog${primary ? " rec" : ""}">
       <div class="prog-top"><div><div class="prog-name">${esc(p.name)}</div>${daysText(p) ? `<div class="muted small">${daysText(p)}</div>` : ""}</div>
-      <button class="btn${primary ? " primary" : ""}" data-act="start" data-id="${p.id}">Starta</button></div>
+      <button class="btn${primary ? " primary" : ""}" data-act="start" data-id="${p.id}">${T("Starta", "Start")}</button></div>
       <div class="prog-ex">${p.exercises.map(x => `<span>${esc(x.name)}</span>`).join("")}</div></div>`;
-  return `${paused}${rec.length ? `<section class="section"><h2>Rekommenderat idag · ${DAY_LONG[today]}</h2>${rec.map(p => card(p, true)).join("")}</section>` : ""}
-  ${rest.length ? `<section class="section"><h2>${rec.length ? "Övriga pass" : "Starta pass"}</h2>${rest.map(p => card(p, !rec.length)).join("")}</section>` : ""}
-  ${last ? `<section class="section"><h2>Senaste passet</h2>${sessCard(last, false)}</section>` : ""}`;
+  return `${paused}${rec.length ? `<section class="section"><h2>${T("Rekommenderat idag", "Recommended today")} · ${DAY_LONG()[today]}</h2>${rec.map(p => card(p, true)).join("")}</section>` : ""}
+  ${rest.length ? `<section class="section"><h2>${rec.length ? T("Övriga pass", "Other workouts") : T("Starta pass", "Start a workout")}</h2>${rest.map(p => card(p, !rec.length)).join("")}</section>` : ""}
+  ${last ? `<section class="section"><h2>${T("Senaste passet", "Last workout")}</h2>${sessCard(last, false)}</section>` : ""}`;
 }
 
 function vActive() {
   const a = state.active;
   const rows = a.entries.map((e, i) => {
     const prev = lastFor(e.exId, e.name);
-    const prevTxt = prev ? `Förra: <b class="num">${esc(fmtEntry(prev.e))}</b> · ${dShort(prev.date)}` : "Första gången";
+    const prevTxt = prev ? `${T("Förra", "Last")}: <b class="num">${esc(fmtEntry(prev.e))}</b> · ${dShort(prev.date)}` : T("Första gången", "First time");
     const tips = tipsFor(e), open = state.tipsOpen && state.tipsOpen.has(i);
     const head = `<div class="fig">${ICONS[e.icon] || ICONS.gen}</div>
-      <div class="name">${esc(e.name)}${e.locked ? ` <span class="chip lock">Låst</span>` : ""}
-        <a class="xbtn" href="${videoUrl(e.name)}" target="_blank" rel="noopener" aria-label="Se video: ${esc(e.name)}">${PLAY}Video</a>
+      <div class="name">${esc(e.name)}${e.locked ? ` <span class="chip lock">${T("Låst", "Locked")}</span>` : ""}
+        <a class="xbtn" href="${videoUrl(e.name)}" target="_blank" rel="noopener" aria-label="${T("Se video", "Watch video")}: ${esc(e.name)}">${PLAY}Video</a>
         ${tips.length ? `<button class="xbtn" data-act="tips" data-i="${i}" aria-expanded="${open}">Tips</button>` : ""}</div>
-      <div class="prev">${e.locked ? "Samma varje pass" : prevTxt}</div>`;
+      <div class="prev">${e.locked ? T("Samma varje pass", "Same every workout") : prevTxt}</div>`;
     const tipList = open && tips.length ? `<ul class="tips">${tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : "";
-    if (e.locked) return `<div class="row">${head}<div class="fixed">Idag: <b class="num">${esc(fmtEntry(e))}</b></div>${tipList}</div>`;
+    if (e.locked) return `<div class="row">${head}<div class="fixed">${T("Idag", "Today")}: <b class="num">${esc(fmtEntry(e))}</b></div>${tipList}</div>`;
     const ph = prev ? prev.e : (e.plan || {});
     const f = (key, label, mode, placeholder) => `<div class="field box"><label for="a-${i}-${key}">${label}</label>
       <input id="a-${i}-${key}" inputmode="${mode}" data-a="${i}" data-f="${key}" value="${esc(e[key] ?? "")}" placeholder="${placeholder ?? ""}"></div>`;
     const inputs = [];
-    if (e.type === "kg") inputs.push(f("value", "Kilo", "decimal", ph.value != null ? fmtNum(ph.value) : ""));
+    if (e.type === "kg") inputs.push(f("value", UNIT === "lb" ? "Lbs" : T("Kilo", "Kg"), "decimal", ph.value != null ? fmtW(ph.value) : ""));
     if (e.type === "time") inputs.push(f("value", "Min", "decimal", ph.value != null ? fmtNum(ph.value) : ""));
     if (e.type !== "time") inputs.push(f("reps", "Reps", "numeric", ph.reps ?? ""));
-    inputs.push(f("sets", "Set", "numeric", ph.sets ?? ""));
+    inputs.push(f("sets", T("Set", "Sets"), "numeric", ph.sets ?? ""));
     return `<div class="row">${head}<div class="inputs">${inputs.join("")}</div>${tipList}</div>`;
   }).join("");
   const c = state.confirm === "cancel";
   return `<section class="section">
-    <div><div class="prog-name">${esc(a.programName)}</div><div class="muted small">${dLong(a.startedAt)} · grå siffror visar förra passet</div></div>
+    <div><div class="prog-name">${esc(a.programName)}</div><div class="muted small">${dLong(a.startedAt)} · ${T("grå siffror visar förra passet", "gray numbers show your last workout")}</div></div>
     <div class="rows">${rows}</div>
-    <button class="btn primary wide" data-act="finish">Spara pass</button>
-    ${c ? `<div class="card btnrow"><span style="flex:1 1 100%">Avbryta passet? Det du fyllt i sparas inte.</span>
-      <button class="btn danger" data-act="cancelYes">Ja, avbryt</button><button class="btn" data-act="confirmNo">Fortsätt träna</button></div>`
-      : `<button class="btn wide" data-act="cancel">Avbryt passet</button>`}
+    <button class="btn primary wide" data-act="finish">${T("Spara pass", "Save workout")}</button>
+    ${c ? `<div class="card btnrow"><span style="flex:1 1 100%">${T("Avbryta passet? Det du fyllt i sparas inte.", "Cancel the workout? What you've entered won't be saved.")}</span>
+      <button class="btn danger" data-act="cancelYes">${T("Ja, avbryt", "Yes, cancel")}</button><button class="btn" data-act="confirmNo">${T("Fortsätt träna", "Keep training")}</button></div>`
+      : `<button class="btn wide" data-act="cancel">${T("Avbryt passet", "Cancel workout")}</button>`}
   </section>`;
 }
 
 function vPrograms() {
   if (state.editing) return vEditor();
-  return `<section class="section"><h2>Mina program</h2>
+  return `<section class="section"><h2>${T("Mina program", "My programs")}</h2>
     ${state.programs.length ? state.programs.map(p => `<div class="card prog">
-      <div class="prog-top"><div><div class="prog-name">${esc(p.name)}</div><div class="muted small">${p.exercises.length} övningar${daysText(p) ? " · " + daysText(p) : ""}</div></div>
-      <button class="btn sm" data-act="edit" data-id="${p.id}">Redigera</button></div>
-      <div class="prog-ex">${p.exercises.map(x => `<span>${esc(x.name)}${x.locked ? " · låst" : ""}</span>`).join("")}</div></div>`).join("")
-    : `<div class="card empty"><p class="muted">Du har inga program än.</p></div>`}
-    <button class="btn primary wide" data-act="newProgram">Bygg nytt program</button></section>
+      <div class="prog-top"><div><div class="prog-name">${esc(p.name)}</div><div class="muted small">${p.exercises.length} ${T("övningar", p.exercises.length === 1 ? "exercise" : "exercises")}${daysText(p) ? " · " + daysText(p) : ""}</div></div>
+      <button class="btn sm" data-act="edit" data-id="${p.id}">${T("Redigera", "Edit")}</button></div>
+      <div class="prog-ex">${p.exercises.map(x => `<span>${esc(x.name)}${x.locked ? T(" · låst", " · locked") : ""}</span>`).join("")}</div></div>`).join("")
+    : `<div class="card empty"><p class="muted">${T("Du har inga program än.", "You don't have any programs yet.")}</p></div>`}
+    <button class="btn primary wide" data-act="newProgram">${T("Bygg nytt program", "Build a new program")}</button></section>
     <section class="section"><h2>Coach</h2><div class="card section">
-      <p class="muted small" style="margin:0">Låt AI-coachen föreslå nya pass utifrån dina mål. Du godkänner innan något sparas.</p>
-      <button class="btn wide" data-act="openCoach">Fråga coachen</button></div></section>
-    <section class="section"><h2>Egen kopia</h2><div class="card section">
-      <p class="muted small" style="margin:0">Allt sparas i ditt konto. Vill du ha en egen fil med all data kan du exportera den.</p>
-      <div class="btnrow"><button class="btn" data-act="export">Exportera</button></div></div></section>`;
+      <p class="muted small" style="margin:0">${T("Låt AI-coachen föreslå nya pass utifrån dina mål. Du godkänner innan något sparas.", "Let the AI coach suggest new workouts based on your goals. You approve before anything is saved.")}</p>
+      <button class="btn wide" data-act="openCoach">${T("Fråga coachen", "Ask the coach")}</button></div></section>
+    <section class="section"><h2>${T("Egen kopia", "Your own copy")}</h2><div class="card section">
+      <p class="muted small" style="margin:0">${T("Allt sparas i ditt konto. Vill du ha en egen fil med all data kan du exportera den.", "Everything is saved to your account. If you want your own file with all your data, you can export it.")}</p>
+      <div class="btnrow"><button class="btn" data-act="export">${T("Exportera", "Export")}</button></div></div></section>`;
 }
 
 function vEditor() {
   const p = state.editing;
   const exs = p.exercises.map((x, i) => {
-    const typeOpts = Object.entries(TYPES).map(([k, v]) => `<option value="${k}"${x.type === k ? " selected" : ""}>${v}</option>`).join("");
-    const iconOpts = Object.entries(ICON_NAMES).map(([k, v]) => `<option value="${k}"${x.icon === k ? " selected" : ""}>${v}</option>`).join("");
+    const typeOpts = Object.entries(TYPES()).map(([k, v]) => `<option value="${k}"${x.type === k ? " selected" : ""}>${v}</option>`).join("");
+    const iconOpts = Object.entries(ICON_NAMES()).map(([k, v]) => `<option value="${k}"${x.icon === k ? " selected" : ""}>${v}</option>`).join("");
     if (!state.open.has(x.id) && x.name.trim()) {
-      return `<button class="ex-mini" data-act="openEx" data-i="${i}" aria-label="Redigera ${esc(x.name)}">
+      return `<button class="ex-mini" data-act="openEx" data-i="${i}" aria-label="${T("Redigera", "Edit")} ${esc(x.name)}">
         <span class="fig">${ICONS[x.icon] || ICONS.gen}</span><span class="nm">${esc(x.name)}</span>
         <span class="sum">${esc(planText(x))}${x.locked ? LOCK : ""}</span></button>`;
     }
-    const fx = (key, label, mode) => `<div class="field box"><label for="e-${i}-${key}">${label}</label><input id="e-${i}-${key}" inputmode="${mode}" data-e="${i}" data-f="${key}" value="${esc(x[key] ?? "")}"></div>`;
+    const fx = (key, label, mode, val) => `<div class="field box"><label for="e-${i}-${key}">${label}</label><input id="e-${i}-${key}" inputmode="${mode}" data-e="${i}" data-f="${key}" value="${esc(val ?? "")}"></div>`;
+    const v = exValue(x);
+    const vShown = x.vin != null ? x.vin : v == null ? "" : x.type === "kg" ? fmtW(v) : fmtNum(v);
     const fs = [];
-    if (x.type === "kg") fs.push(fx("value", "Kilo", "decimal"));
-    if (x.type === "time") fs.push(fx("value", "Min", "decimal"));
-    if (x.type !== "time") fs.push(fx("reps", "Reps", "numeric"));
-    fs.push(fx("sets", "Set", "numeric"));
-    fs.push(`<button class="lockbtn" data-act="lock" data-i="${i}" aria-pressed="${!!x.locked}" aria-label="Lås övningen" title="Låst: samma varje pass">${x.locked ? LOCK : UNLOCK}</button>`);
+    if (x.type === "kg") fs.push(fx("vin", UNIT === "lb" ? "Lbs" : T("Kilo", "Kg"), "decimal", vShown));
+    if (x.type === "time") fs.push(fx("vin", "Min", "decimal", vShown));
+    if (x.type !== "time") fs.push(fx("reps", "Reps", "numeric", x.reps));
+    fs.push(fx("sets", T("Set", "Sets"), "numeric", x.sets));
+    fs.push(`<button class="lockbtn" data-act="lock" data-i="${i}" aria-pressed="${!!x.locked}" aria-label="${T("Lås övningen", "Lock exercise")}" title="${T("Låst: samma varje pass", "Locked: same every workout")}">${x.locked ? LOCK : UNLOCK}</button>`);
     const fixed = `<div class="inputs" style="margin:0">${fs.join("")}</div>`;
     return `<div class="ex-edit">
       <div class="ex-head"><div class="fig">${ICONS[x.icon] || ICONS.gen}</div>
-        <input id="e-${i}-name" type="text" aria-label="Övningens namn" placeholder="Övningens namn" data-e="${i}" data-f="name" value="${esc(x.name)}">
+        <input id="e-${i}-name" type="text" aria-label="${T("Övningens namn", "Exercise name")}" placeholder="${T("Övningens namn", "Exercise name")}" data-e="${i}" data-f="name" value="${esc(x.name)}">
         <div class="iconbtns">
-          <button class="iconbtn" data-act="up" data-i="${i}" aria-label="Flytta upp"${i === 0 ? " disabled" : ""}>${S('<path d="M12 18V6M6.5 11.5L12 6l5.5 5.5"/>')}</button>
-          <button class="iconbtn" data-act="down" data-i="${i}" aria-label="Flytta ner"${i === p.exercises.length - 1 ? " disabled" : ""}>${S('<path d="M12 6v12M6.5 12.5L12 18l5.5-5.5"/>')}</button>
-          <button class="iconbtn" data-act="delEx" data-i="${i}" aria-label="Ta bort övning">${S('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
+          <button class="iconbtn" data-act="up" data-i="${i}" aria-label="${T("Flytta upp", "Move up")}"${i === 0 ? " disabled" : ""}>${S('<path d="M12 18V6M6.5 11.5L12 6l5.5 5.5"/>')}</button>
+          <button class="iconbtn" data-act="down" data-i="${i}" aria-label="${T("Flytta ner", "Move down")}"${i === p.exercises.length - 1 ? " disabled" : ""}>${S('<path d="M12 6v12M6.5 12.5L12 18l5.5-5.5"/>')}</button>
+          <button class="iconbtn" data-act="delEx" data-i="${i}" aria-label="${T("Ta bort övning", "Remove exercise")}">${S('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
         </div></div>
       <div class="two">
-        <div class="field"><label for="e-${i}-type">Mäts i</label><select id="e-${i}-type" data-e="${i}" data-f="type">${typeOpts}</select></div>
-        <div class="field"><label for="e-${i}-icon">Figur</label><select id="e-${i}-icon" data-e="${i}" data-f="icon">${iconOpts}</select></div>
+        <div class="field"><label for="e-${i}-type">${T("Mäts i", "Measured in")}</label><select id="e-${i}-type" data-e="${i}" data-f="type">${typeOpts}</select></div>
+        <div class="field"><label for="e-${i}-icon">${T("Figur", "Figure")}</label><select id="e-${i}-icon" data-e="${i}" data-f="icon">${iconOpts}</select></div>
       </div>
       ${fixed}
-      <div class="field"><label for="e-${i}-tips">Teknikpunkter <span class="opt">(valfritt, en per rad)</span></label>
-        <textarea id="e-${i}-tips" data-e="${i}" data-f="tipsText" placeholder="T.ex. Rak rygg">${esc(x.tipsText ?? (x.tips || []).join("\n"))}</textarea></div>
-      <button class="btn sm" data-act="closeEx" data-i="${i}" style="align-self:flex-start">Klar</button>
+      <div class="field"><label for="e-${i}-tips">${T("Teknikpunkter", "Technique cues")} <span class="opt">${T("(valfritt, en per rad)", "(optional, one per line)")}</span></label>
+        <textarea id="e-${i}-tips" data-e="${i}" data-f="tipsText" placeholder="${T("T.ex. Rak rygg", "E.g. Keep your back straight")}">${esc(x.tipsText ?? (x.tips || []).join("\n"))}</textarea></div>
+      <button class="btn sm" data-act="closeEx" data-i="${i}" style="align-self:flex-start">${T("Klar", "Done")}</button>
     </div>`;
   }).join("");
   const isNew = !state.programs.some(q => q.id === p.id);
   const c = state.confirm === "delProgram";
   return `<section class="section">
-    <h2>${isNew ? "Bygg mitt program" : "Redigera program"}</h2>
-    <div class="field"><label for="p-name">Namn på passet</label><input id="p-name" type="text" data-p="name" value="${esc(p.name)}" placeholder="T.ex. Pass A eller Ben"></div>
-    <div class="field"><label>Dagar jag kör passet</label><div class="days" role="group" aria-label="Veckodagar">
-      ${DAY_ORDER.map(d => `<button data-act="day" data-v="${d}" aria-pressed="${(p.days || []).includes(d)}" aria-label="${DAY_LONG[d]}">${DAY_SHORT[d]}</button>`).join("")}</div></div>
-    <div class="rows">${exs || `<div class="empty"><p class="muted">Inga övningar än. Lägg till din första nedan.</p></div>`}</div>
-    <button class="btn wide" data-act="addEx">+ Lägg till övning</button>
-    <p class="muted small" style="margin:0">Tryck på låset för övningar som är samma varje gång, som uppvärmning. De får inga rutor när du kör passet. Reps och set som är 1 visas inte.</p>
-    <div class="btnrow"><button class="btn primary" data-act="saveProgram">Spara program</button><button class="btn" data-act="closeEdit">Avbryt</button></div>
-    ${isNew ? "" : c ? `<div class="card btnrow"><span style="flex:1 1 100%">Ta bort ${esc(p.name)}? Sparade pass ligger kvar i historiken.</span>
-      <button class="btn danger" data-act="delProgramYes">Ja, ta bort</button><button class="btn" data-act="confirmNo">Behåll</button></div>`
-      : `<button class="btn danger wide" data-act="delProgram">Ta bort programmet</button>`}
+    <h2>${isNew ? T("Bygg mitt program", "Build my program") : T("Redigera program", "Edit program")}</h2>
+    <div class="field"><label for="p-name">${T("Namn på passet", "Workout name")}</label><input id="p-name" type="text" data-p="name" value="${esc(p.name)}" placeholder="${T("T.ex. Pass A eller Ben", "E.g. Workout A or Legs")}"></div>
+    <div class="field"><label>${T("Dagar jag kör passet", "Days I do this workout")}</label><div class="days" role="group" aria-label="${T("Veckodagar", "Weekdays")}">
+      ${DAY_ORDER.map(d => `<button data-act="day" data-v="${d}" aria-pressed="${(p.days || []).includes(d)}" aria-label="${DAY_LONG()[d]}">${DAY_SHORT()[d]}</button>`).join("")}</div></div>
+    <div class="rows">${exs || `<div class="empty"><p class="muted">${T("Inga övningar än. Lägg till din första nedan.", "No exercises yet. Add your first one below.")}</p></div>`}</div>
+    <button class="btn wide" data-act="addEx">${T("+ Lägg till övning", "+ Add exercise")}</button>
+    <p class="muted small" style="margin:0">${T("Tryck på låset för övningar som är samma varje gång, som uppvärmning. De får inga rutor när du kör passet. Reps och set som är 1 visas inte.", "Tap the lock for exercises that are the same every time, like a warm-up. They get no input boxes during the workout. Reps and sets of 1 aren't shown.")}</p>
+    <div class="btnrow"><button class="btn primary" data-act="saveProgram">${T("Spara program", "Save program")}</button><button class="btn" data-act="closeEdit">${T("Avbryt", "Cancel")}</button></div>
+    ${isNew ? "" : c ? `<div class="card btnrow"><span style="flex:1 1 100%">${T(`Ta bort ${esc(p.name)}? Sparade pass ligger kvar i historiken.`, `Delete ${esc(p.name)}? Saved workouts stay in your history.`)}</span>
+      <button class="btn danger" data-act="delProgramYes">${T("Ja, ta bort", "Yes, delete")}</button><button class="btn" data-act="confirmNo">${T("Behåll", "Keep")}</button></div>`
+      : `<button class="btn danger wide" data-act="delProgram">${T("Ta bort programmet", "Delete program")}</button>`}
   </section>`;
 }
 
 function sessCard(s, withDelete) {
   const c = state.confirm === "del-" + s.id;
   return `<div class="card sess">
-    <div class="sess-head"><div><div class="sess-date">${dLong(s.date)}</div><div class="muted small">${esc(s.programName)}${s.example ? ` <span class="chip">Exempel</span>` : ""}</div></div>
-    ${withDelete && !c ? `<button class="btn sm danger" data-act="delSess" data-id="${s.id}">Ta bort</button>` : ""}</div>
+    <div class="sess-head"><div><div class="sess-date">${dLong(s.date)}</div><div class="muted small">${esc(s.programName)}${s.example ? ` <span class="chip">${T("Exempel", "Example")}</span>` : ""}</div></div>
+    ${withDelete && !c ? `<button class="btn sm danger" data-act="delSess" data-id="${s.id}">${T("Ta bort", "Delete")}</button>` : ""}</div>
     <ul>${(s.entries || []).map(e => `<li><span>${esc(e.name)}</span><span>${esc(fmtEntry(e))}</span></li>`).join("")}</ul>
-    ${c ? `<div class="btnrow"><button class="btn danger" data-act="delSessYes" data-id="${s.id}">Ja, ta bort passet</button><button class="btn" data-act="confirmNo">Behåll</button></div>` : ""}
+    ${c ? `<div class="btnrow"><button class="btn danger" data-act="delSessYes" data-id="${s.id}">${T("Ja, ta bort passet", "Yes, delete workout")}</button><button class="btn" data-act="confirmNo">${T("Behåll", "Keep")}</button></div>` : ""}
   </div>`;
 }
 
@@ -771,23 +823,24 @@ function yearGrid() {
   for (let i = 0; i < n; i++) {
     const d = new Date(y, 0, 1 + i), k = dayKey(d), on = logged.has(k);
     if (on) count++;
-    cells += `<i class="${on ? "on" : ""}${k === dayKey(now) ? " today" : ""}" title="${d.toLocaleDateString("sv-SE", { day: "numeric", month: "long" })}${on ? " · pass loggat" : ""}"></i>`;
+    cells += `<i class="${on ? "on" : ""}${k === dayKey(now) ? " today" : ""}" title="${d.toLocaleDateString(LOC(), { day: "numeric", month: "long" })}${on ? T(" · pass loggat", " · workout logged") : ""}"></i>`;
   }
+  const days = T(`${count} ${count === 1 ? "dag" : "dagar"} med pass`, `${count} ${count === 1 ? "day" : "days"} with a workout`);
   return `<div class="card section">
-    <div class="yhead"><button class="iconbtn" data-act="year" data-v="-1" aria-label="Föregående år">${S('<path d="M15 5l-7 7 7 7"/>')}</button>
-      <div style="text-align:center"><div class="y">${y}</div><div class="muted small">${count} ${count === 1 ? "dag" : "dagar"} med pass</div></div>
-      <button class="iconbtn" data-act="year" data-v="1" aria-label="Nästa år">${S('<path d="M9 5l7 7-7 7"/>')}</button></div>
-    <div class="yg" role="img" aria-label="${count} dagar med pass under ${y}">${cells}</div>
-    <div class="legend"><span><i></i>Inget pass</span><span><i class="on"></i>Pass loggat</span><span>1 jan uppe till vänster</span></div>
+    <div class="yhead"><button class="iconbtn" data-act="year" data-v="-1" aria-label="${T("Föregående år", "Previous year")}">${S('<path d="M15 5l-7 7 7 7"/>')}</button>
+      <div style="text-align:center"><div class="y">${y}</div><div class="muted small">${days}</div></div>
+      <button class="iconbtn" data-act="year" data-v="1" aria-label="${T("Nästa år", "Next year")}">${S('<path d="M9 5l7 7-7 7"/>')}</button></div>
+    <div class="yg" role="img" aria-label="${days} · ${y}">${cells}</div>
+    <div class="legend"><span><i></i>${T("Inget pass", "No workout")}</span><span><i class="on"></i>${T("Pass loggat", "Workout logged")}</span><span>${T("1 jan uppe till vänster", "Jan 1 at top left")}</span></div>
   </div>`;
 }
 function vHistory() {
-  if (!state.sessions.length) return yearGrid() + `<div class="card empty"><p><b>Inga pass sparade än.</b></p><p class="muted">När du sparar ett pass hamnar det här.</p></div>`;
-  const ex = state.sessions.filter(s => s.example).length;
-  return `${yearGrid()}${ex ? `<div class="banner"><span>${ex} exempelpass visas så du ser hur det ser ut.</span>
-    ${state.confirm === "clearEx" ? `<span class="btnrow"><button class="btn sm danger" data-act="clearExYes">Ja, ta bort</button><button class="btn sm" data-act="confirmNo">Nej</button></span>`
-      : `<button class="btn sm" data-act="clearEx">Ta bort exempel</button>`}</div>` : ""}
-    <section class="section"><h2>${state.sessions.length} pass</h2>${state.sessions.map(s => sessCard(s, true)).join("")}</section>`;
+  if (!state.sessions.length) return yearGrid() + `<div class="card empty"><p><b>${T("Inga pass sparade än.", "No workouts saved yet.")}</b></p><p class="muted">${T("När du sparar ett pass hamnar det här.", "When you save a workout, it shows up here.")}</p></div>`;
+  const ex = state.sessions.filter(s => s.example).length, n = state.sessions.length;
+  return `${yearGrid()}${ex ? `<div class="banner"><span>${T(`${ex} exempelpass visas så du ser hur det ser ut.`, `${ex} example workouts are shown so you can see how it looks.`)}</span>
+    ${state.confirm === "clearEx" ? `<span class="btnrow"><button class="btn sm danger" data-act="clearExYes">${T("Ja, ta bort", "Yes, delete")}</button><button class="btn sm" data-act="confirmNo">${T("Nej", "No")}</button></span>`
+      : `<button class="btn sm" data-act="clearEx">${T("Ta bort exempel", "Remove examples")}</button>`}</div>` : ""}
+    <section class="section"><h2>${n} ${T("pass", n === 1 ? "workout" : "workouts")}</h2>${state.sessions.map(s => sessCard(s, true)).join("")}</section>`;
 }
 
 function passIndex() {
@@ -811,12 +864,12 @@ function exerciseIndex(passKey) {
 
 function vProgress() {
   const passes = passIndex();
-  if (!passes.length) return `<div class="card empty"><p><b>Ingen progression än.</b></p><p class="muted">Spara ett par pass så ritas en graf per övning här.</p></div>`;
+  if (!passes.length) return `<div class="card empty"><p><b>${T("Ingen progression än.", "No progress yet.")}</b></p><p class="muted">${T("Spara ett par pass så ritas en graf per övning här.", "Save a couple of workouts and a chart per exercise will show up here.")}</p></div>`;
   if (!state.progPass || !passes.some(p => p.key === state.progPass)) state.progPass = passes[0].key;
-  const passSel = `<div class="field"><label for="prog-pass">Pass</label><select id="prog-pass" data-act-change="progPass">
+  const passSel = `<div class="field"><label for="prog-pass">${T("Pass", "Workout")}</label><select id="prog-pass" data-act-change="progPass">
       ${passes.map(p => `<option value="${esc(p.key)}"${p.key === state.progPass ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>`;
   const list = exerciseIndex(state.progPass);
-  if (!list.length) return `<section class="section">${passSel}<div class="card empty"><p class="muted">Det här passet har bara låsta övningar, så det finns ingen progression att visa.</p></div></section>`;
+  if (!list.length) return `<section class="section">${passSel}<div class="card empty"><p class="muted">${T("Det här passet har bara låsta övningar, så det finns ingen progression att visa.", "This workout only has locked exercises, so there's no progress to show.")}</p></div></section>`;
   if (!state.progKey || !list.some(x => x.key === state.progKey)) state.progKey = (list.find(x => x.type === "kg") || list[0]).key;
   const cur = list.find(x => x.key === state.progKey);
   const u = metricUnit(cur.type);
@@ -825,17 +878,28 @@ function vProgress() {
   const diff = lastV - first;
   return `<section class="section">
     ${passSel}
-    <div class="field"><label for="prog-ex">Övning</label><select id="prog-ex" data-act-change="progEx">
+    <div class="field"><label for="prog-ex">${T("Övning", "Exercise")}</label><select id="prog-ex" data-act-change="progEx">
       ${list.map(x => `<option value="${esc(x.key)}"${x.key === cur.key ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>
     <div class="stats">
-      <div class="stat"><div class="k">Senast</div><div class="v">${fmtNum(lastV)} <span class="small muted">${u}</span></div></div>
-      <div class="stat"><div class="k">Bästa</div><div class="v">${fmtNum(best)} <span class="small muted">${u}</span></div></div>
-      <div class="stat"><div class="k">Ökning</div><div class="v">${diff > 0 ? "+" : ""}${fmtNum(diff)} <span class="small muted">${u}</span></div></div>
+      <div class="stat"><div class="k">${T("Senast", "Latest")}</div><div class="v">${fmt1(lastV)} <span class="small muted">${u}</span></div></div>
+      <div class="stat"><div class="k">${T("Bästa", "Best")}</div><div class="v">${fmt1(best)} <span class="small muted">${u}</span></div></div>
+      <div class="stat"><div class="k">${T("Ökning", "Gain")}</div><div class="v">${diff > 0 ? "+" : ""}${fmt1(diff)} <span class="small muted">${u}</span></div></div>
     </div>
     <div class="card">${chart(cur.points, u)}</div>
-    <h2>Alla pass · ${esc(cur.name)}</h2>
+    <h2>${T("Alla pass", "All workouts")} · ${esc(cur.name)}</h2>
     <div class="card sess"><ul>${cur.points.slice().reverse().map(p => `<li><span>${dShort(p.date)}</span><span>${esc(fmtEntry(p.e))}</span></li>`).join("")}</ul></div>
   </section>`;
+}
+
+function vSettings() {
+  return `<section class="section"><h2>${T("Språk", "Language")}</h2><div class="card section">
+      ${seg("setLang", [["sv", "Svenska"], ["en", "English"]], LANG)}
+      <p class="muted small" style="margin:0">${T("Coachen svarar på det språk du väljer. Övningar du skrivit själv översätts inte.", "The coach answers in the language you choose. Exercises you typed yourself aren't translated.")}</p></div></section>
+    <section class="section"><h2>${T("Viktenhet", "Weight unit")}</h2><div class="card section">
+      ${seg("setUnit", [["kg", T("Kilo (kg)", "Kilograms (kg)")], ["lb", T("Pund (lb)", "Pounds (lb)")]], UNIT)}
+      <p class="muted small" style="margin:0">${T("Allt sparas i kilo och räknas om exakt (1 kg = 2,20462 lb), så du kan byta när du vill utan att något ändras.", "Everything is stored in kilograms and converted exactly (1 kg = 2.20462 lb), so you can switch anytime without changing your data.")}</p></div></section>
+    <section class="section"><h2>${T("Konto", "Account")}</h2><div class="card section">
+      <div class="account"><span class="muted small">${esc((state.user && state.user.email) || "")}</span><button class="btn sm" data-act="logout">${T("Logga ut", "Log out")}</button></div></div></section>`;
 }
 
 function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p; }
@@ -857,7 +921,7 @@ function chart(points, unit) {
   const area = n > 1 ? `<polygon class="ar" points="${x(0)},${y(lo)} ${pts} ${x(n - 1)},${y(lo)}"/>` : "";
   const dots = points.map((p, i) => i === n - 1 ? "" : `<circle class="dt" cx="${x(i)}" cy="${y(p.y)}" r="4"/>`).join("");
   const ex = x(n - 1), ey = y(points[n - 1].y);
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf över ${unit} per pass">
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${T("Graf", "Chart")}: ${unit}">
     ${g}${xl}${area}${n > 1 ? `<polyline class="ln" points="${pts}"/>` : ""}${dots}
     <circle class="end" cx="${ex}" cy="${ey}" r="6"/>
     <text class="endlbl" x="${ex}" y="${ey < T + 18 ? ey + 22 : ey - 12}" text-anchor="${n === 1 ? "middle" : "end"}">${fmtNum(points[n - 1].y)} ${unit}</text></svg>`;
@@ -870,18 +934,20 @@ function render(force) {
   if (!force && a && main.contains(a) && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) { pending = true; return; }
   pending = false;
   if (state.screen !== "app") {
-    $("#title").textContent = "Gymloggen"; $("#burger").hidden = true; $("#menu").hidden = true; state.menu = false;
+    document.title = "Gymloggen"; $("#title").textContent = "Gymloggen"; $("#burger").hidden = true; $("#menu").hidden = true; state.menu = false;
     renderModal(); main.innerHTML = vScreen(); return;
   }
   $("#burger").hidden = false;
-  const titles = { trana: state.active && !state.active.paused ? "Pass pågår" : "Träna", program: "Program", historik: "Historik", progression: "Progression" };
-  $("#title").textContent = titles[state.view];
-  $("#tabs").innerHTML = TABS.map(([k, v]) => `<button data-tab="${k}"${state.view === k ? ' aria-current="page"' : ""}>${TAB_ICONS[k]}<span>${v}</span></button>`).join("");
-  $("#tabs").innerHTML += `<button data-act="openCoach">${S('<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/>')}<span>Fråga coachen</span></button>`;
-  $("#account").innerHTML = state.user ? `<span class="muted small">${esc(state.user.email || "")}</span><button class="btn sm" data-act="logout">Logga ut</button>` : "";
+  const titles = { trana: state.active && !state.active.paused ? T("Pass pågår", "Workout in progress") : T("Träna", "Train"), program: T("Program", "Programs"), historik: T("Historik", "History"), progression: T("Progression", "Progress"), installningar: T("Inställningar", "Settings") };
+  $("#title").textContent = titles[state.view] || titles.trana;
+  $("#title").setAttribute("aria-label", T("Till startsidan för fliken", "Back to the start of this tab"));
+  $("#burger").setAttribute("aria-label", T("Meny", "Menu"));
+  $("#tabs").innerHTML = TABS().map(([k, v]) => `<button data-tab="${k}"${state.view === k ? ' aria-current="page"' : ""}>${TAB_ICONS[k]}<span>${v}</span></button>`).join("");
+  $("#tabs").innerHTML += `<button data-act="openCoach">${S('<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/>')}<span>${T("Fråga coachen", "Ask the coach")}</span></button>`;
+  $("#account").innerHTML = state.user ? `<span class="muted small">${esc(state.user.email || "")}</span><button class="btn sm" data-act="logout">${T("Logga ut", "Log out")}</button>` : "";
   $("#menu").hidden = !state.menu; $("#burger").setAttribute("aria-expanded", String(!!state.menu));
   renderModal();
-  main.innerHTML = state.view === "trana" ? vTrain() : state.view === "program" ? vPrograms() : state.view === "historik" ? vHistory() : vProgress();
+  main.innerHTML = state.view === "trana" ? vTrain() : state.view === "program" ? vPrograms() : state.view === "historik" ? vHistory() : state.view === "installningar" ? vSettings() : vProgress();
 }
 main.addEventListener("focusout", () => { if (pending) setTimeout(() => { const a = document.activeElement; if (!(a && main.contains(a) && /INPUT|SELECT|TEXTAREA/.test(a.tagName))) render(true); }, 0); });
 
@@ -891,16 +957,16 @@ function renderModal() {
   if (!md) { m.hidden = true; m.innerHTML = ""; return; }
   m.hidden = false;
   m.innerHTML = md.kind === "pass"
-    ? `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mt"><h3 id="mt">Avsluta passet?</h3>
-        <p>Du har ett pass igång. Vill du spara det du fyllt i som utkast eller slänga det?</p>
-        <button class="btn" data-act="mBack">Gå tillbaka</button>
-        <button class="btn primary" data-act="mDraft">Spara som utkast</button>
-        <button class="btn danger" data-act="mDrop">Släng passet</button></div>`
-    : `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mt"><h3 id="mt">Osparade ändringar</h3>
-        <p>Du har ändrat i programmet utan att spara.</p>
-        <button class="btn" data-act="mBack">Gå tillbaka</button>
-        <button class="btn primary" data-act="mSaveProg">Spara programmet</button>
-        <button class="btn danger" data-act="mDropEdit">Släng ändringarna</button></div>`;
+    ? `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mt"><h3 id="mt">${T("Avsluta passet?", "End the workout?")}</h3>
+        <p>${T("Du har ett pass igång. Vill du spara det du fyllt i som utkast eller slänga det?", "You have a workout in progress. Do you want to save what you've entered as a draft or discard it?")}</p>
+        <button class="btn" data-act="mBack">${T("Gå tillbaka", "Go back")}</button>
+        <button class="btn primary" data-act="mDraft">${T("Spara som utkast", "Save as draft")}</button>
+        <button class="btn danger" data-act="mDrop">${T("Släng passet", "Discard workout")}</button></div>`
+    : `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mt"><h3 id="mt">${T("Osparade ändringar", "Unsaved changes")}</h3>
+        <p>${T("Du har ändrat i programmet utan att spara.", "You've changed the program without saving.")}</p>
+        <button class="btn" data-act="mBack">${T("Gå tillbaka", "Go back")}</button>
+        <button class="btn primary" data-act="mSaveProg">${T("Spara programmet", "Save program")}</button>
+        <button class="btn danger" data-act="mDropEdit">${T("Släng ändringarna", "Discard changes")}</button></div>`;
   const first = m.querySelector("button"); first && first.focus();
 }
 function leave(next) {
@@ -911,15 +977,15 @@ function leave(next) {
 function saveProgram() {
   const E = state.editing;
   E.name = E.name.trim(); E.exercises = E.exercises.filter(x => x.name.trim());
-  if (!E.name) { toast("Ge programmet ett namn först."); return false; }
-  if (!E.exercises.length) { toast("Lägg till minst en övning med namn."); return false; }
-  E.exercises.forEach(x => { if (x.tipsText != null) { x.tips = x.tipsText.split("\n").map(t => t.trim()).filter(Boolean).slice(0, 4); delete x.tipsText; } x.name = x.name.trim(); x.locked = !!x.locked; x.value = x.type === "bw" ? null : num(x.value); x.reps = x.type === "time" ? 1 : (num(x.reps) || 1); x.sets = num(x.sets) || 1; });
+  if (!E.name) { toast(T("Ge programmet ett namn först.", "Give the program a name first.")); return false; }
+  if (!E.exercises.length) { toast(T("Lägg till minst en övning med namn.", "Add at least one exercise with a name.")); return false; }
+  E.exercises.forEach(x => { if (x.vin != null) { x.value = exValue(x); delete x.vin; } if (x.tipsText != null) { x.tips = x.tipsText.split("\n").map(t => t.trim()).filter(Boolean).slice(0, 4); delete x.tipsText; } x.name = x.name.trim(); x.locked = !!x.locked; x.value = x.type === "bw" ? null : num(x.value); x.reps = x.type === "time" ? 1 : (num(x.reps) || 1); x.sets = num(x.sets) || 1; });
   const list = state.programs.slice(); const at = list.findIndex(p => p.id === E.id);
   at >= 0 ? list[at] = E : list.push(E);
-  Store.savePrograms(list); state.editing = null; toast("Programmet sparat"); return true;
+  Store.savePrograms(list); state.editing = null; toast(T("Programmet sparat", "Program saved")); return true;
 }
 function go(view) { state.view = view; state.confirm = null; try { history.replaceState(null, "", "#" + view); } catch (_) { location.hash = view; } render(true); window.scrollTo(0, 0); }
-function fromHash() { const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) state.view = h; }
+function fromHash() { const h = location.hash.slice(1); if (TABS().some(t => t[0] === h)) state.view = h; }
 window.addEventListener("hashchange", () => { fromHash(); render(true); });
 
 /* ---------- actions ---------- */
@@ -938,7 +1004,7 @@ document.addEventListener("click", ev => {
     case "closeEdit": state.editing = null; break;
     case "addEx": { const nx = newEx(); E.exercises.forEach(x => { if (x.name.trim()) state.open.delete(x.id); }); E.exercises.push(nx); state.open.add(nx.id); render(true); const el = document.getElementById(`e-${E.exercises.length - 1}-name`); el && el.focus(); return; }
     case "openEx": state.open.add(E.exercises[i].id); break;
-    case "closeEx": if (!E.exercises[i].name.trim()) { toast("Ge övningen ett namn först."); return; } state.open.delete(E.exercises[i].id); break;
+    case "closeEx": if (!E.exercises[i].name.trim()) { toast(T("Ge övningen ett namn först.", "Give the exercise a name first.")); return; } state.open.delete(E.exercises[i].id); break;
     case "delEx": state.open.delete(E.exercises[i].id); E.exercises.splice(i, 1); break;
     case "up": [E.exercises[i - 1], E.exercises[i]] = [E.exercises[i], E.exercises[i - 1]]; break;
     case "down": [E.exercises[i + 1], E.exercises[i]] = [E.exercises[i], E.exercises[i + 1]]; break;
@@ -946,7 +1012,7 @@ document.addEventListener("click", ev => {
     case "day": { const d = +b.dataset.v; const set = new Set(E.days || []); set.has(d) ? set.delete(d) : set.add(d); E.days = DAY_ORDER.filter(x => set.has(x)); break; }
     case "saveProgram": if (!saveProgram()) return; break;
     case "delProgram": state.confirm = "delProgram"; break;
-    case "delProgramYes": Store.savePrograms(state.programs.filter(p => p.id !== E.id)); state.editing = null; state.confirm = null; toast("Programmet borttaget"); break;
+    case "delProgramYes": Store.savePrograms(state.programs.filter(p => p.id !== E.id)); state.editing = null; state.confirm = null; toast(T("Programmet borttaget", "Program deleted")); break;
     case "start": {
       const p = state.programs.find(q => q.id === id);
       state.active = { programId: p.id, programName: p.name, startedAt: new Date().toISOString(),
@@ -962,23 +1028,28 @@ document.addEventListener("click", ev => {
         const value = num(e.value), reps = num(e.reps), sets = num(e.sets);
         const filled = e.type === "bw" ? reps != null : value != null;
         if (!filled) continue;
-        entries.push({ exId: e.exId, name: e.name, type: e.type, icon: e.icon, locked: false, value: e.type === "bw" ? null : value, reps: e.type === "time" ? 1 : (reps || 1), sets: sets || 1 });
+        entries.push({ exId: e.exId, name: e.name, type: e.type, icon: e.icon, locked: false, value: e.type === "bw" ? null : e.type === "kg" ? fromU(value) : value, reps: e.type === "time" ? 1 : (reps || 1), sets: sets || 1 });
       }
-      if (!entries.length) { toast("Fyll i minst en övning innan du sparar."); return; }
+      if (!entries.length) { toast(T("Fyll i minst en övning innan du sparar.", "Fill in at least one exercise before saving.")); return; }
       Store.addSession({ id: uid(), date: new Date().toISOString(), programId: a.programId, programName: a.programName, entries });
-      state.active = null; saveDraft(); toast("Passet sparat"); break;
+      state.active = null; saveDraft(); toast(T("Passet sparat", "Workout saved")); break;
     }
     case "cancel": state.confirm = "cancel"; break;
     case "cancelYes": state.active = null; saveDraft(); state.confirm = null; break;
     case "delSess": state.confirm = "del-" + id; break;
-    case "delSessYes": Store.deleteSession(id); state.confirm = null; toast("Passet borttaget"); break;
+    case "delSessYes": Store.deleteSession(id); state.confirm = null; toast(T("Passet borttaget", "Workout deleted")); break;
     case "clearEx": state.confirm = "clearEx"; break;
-    case "clearExYes": state.sessions.filter(s => s.example).forEach(s => Store.deleteSession(s.id)); state.confirm = null; toast("Exempelpassen borttagna"); break;
+    case "clearExYes": state.sessions.filter(s => s.example).forEach(s => Store.deleteSession(s.id)); state.confirm = null; toast(T("Exempelpassen borttagna", "Example workouts removed")); break;
     case "confirmNo": state.confirm = null; break;
     case "export": exportData(); return;
     case "importNo": state.pendingImport = null; break;
-    case "importYes": { const d = state.pendingImport; state.pendingImport = null; Store.writeLocal(d); state.programs = d.programs; state.sessions = sortS(d.sessions); toast("Data importerad"); break; }
+    case "importYes": { const d = state.pendingImport; state.pendingImport = null; Store.writeLocal(d); state.programs = d.programs; state.sessions = sortS(d.sessions); toast(T("Data importerad", "Data imported")); break; }
     case "menu": state.menu = !state.menu; break;
+    case "setLang": Settings.save({ lang: b.dataset.v }); break;
+    case "setUnit": {
+      if (state.active && !state.active.paused && state.active.entries.some(e => e.type === "kg" && String(e.value || "").trim())) { toast(T("Spara passet innan du byter viktenhet.", "Save the workout before switching units.")); return; }
+      Settings.save({ unit: b.dataset.v }); toast(b.dataset.v === "lb" ? T("Vikter visas i pund", "Weights shown in pounds") : T("Vikter visas i kilo", "Weights shown in kilograms")); break;
+    }
     case "tips": { state.tipsOpen = state.tipsOpen || new Set(); state.tipsOpen.has(i) ? state.tipsOpen.delete(i) : state.tipsOpen.add(i); break; }
     case "reload": location.reload(); return;
     case "authMode": state.authMode = b.dataset.v; state.authMsg = null; { const e = $("#au-email"); if (e) state.authEmail = e.value; } break;
@@ -995,13 +1066,13 @@ document.addEventListener("click", ev => {
       keep.forEach(x => Store.addSession(clone(x)));
       try { localStorage.setItem("gymloggen-v1-handled", "1"); } catch (_) {}
       Auth.markOnboarded(); state.screen = "app";
-      toast("Datan är flyttad till ditt konto"); break;
+      toast(T("Datan är flyttad till ditt konto", "Your data is now in your account")); break;
     }
     case "skipLegacy": try { localStorage.setItem("gymloggen-v1-handled", "1"); } catch (_) {} state.legacy = null; state.screen = Store.get("onboarded", false) ? "app" : "onboard"; break;
     case "skipOnboard": Auth.markOnboarded(); state.screen = "app"; break;
     case "coachStart": state.coach = newCoach("onboard"); state.screen = "coach"; break;
     case "openCoach": {
-      if (state.view === "program" && dirty()) { toast("Spara eller avbryt programmet först."); return; }
+      if (state.view === "program" && dirty()) { toast(T("Spara eller avbryt programmet först.", "Save or cancel the program first.")); return; }
       state.menu = false; state.editing = null; state.coach = newCoach("app"); state.screen = "coach"; window.scrollTo(0, 0); break;
     }
     case "cset": { const k = b.dataset.k, v = b.dataset.v; state.coach.answers[k] = /^\d+$/.test(v) ? +v : v; break; }
@@ -1020,8 +1091,8 @@ document.addEventListener("click", ev => {
       window.scrollTo(0, 0); break;
     }
     case "mBack": state.modal = null; break;
-    case "mDraft": state.active.paused = true; saveDraft(); state.modal = null; toast("Sparat som utkast"); window.scrollTo(0, 0); break;
-    case "mDrop": state.active = null; saveDraft(); state.modal = null; toast("Passet slängt"); window.scrollTo(0, 0); break;
+    case "mDraft": state.active.paused = true; saveDraft(); state.modal = null; toast(T("Sparat som utkast", "Saved as draft")); window.scrollTo(0, 0); break;
+    case "mDrop": state.active = null; saveDraft(); state.modal = null; toast(T("Passet slängt", "Workout discarded")); window.scrollTo(0, 0); break;
     case "mSaveProg": { const next = state.modal.next; state.modal = null; if (!saveProgram()) break; go(next); return; }
     case "mDropEdit": { const next = state.modal.next; state.modal = null; state.editing = null; go(next); return; }
     case "resume": state.active.paused = false; saveDraft(); break;
@@ -1048,7 +1119,7 @@ document.addEventListener("change", ev => {
         const d = JSON.parse(fr.result);
         if (!Array.isArray(d.programs) || !Array.isArray(d.sessions)) throw 0;
         state.pendingImport = { programs: d.programs, sessions: d.sessions }; render(true);
-      } catch (_) { toast("Filen är inte en säkerhetskopia från Gymloggen."); }
+      } catch (_) { toast(T("Filen är inte en säkerhetskopia från Gymloggen.", "That file isn't a Gymloggen backup.")); }
     };
     fr.readAsText(t.files[0]); t.value = ""; return;
   }
@@ -1063,11 +1134,11 @@ async function exportData() {
   const blob = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" });
   try {
     const file = new File([blob], name, { type: "application/json" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Gymloggen säkerhetskopia" }); return; }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: T("Gymloggen säkerhetskopia", "Gymloggen backup") }); return; }
   } catch (e) { if (e && e.name === "AbortError") return; }
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  toast("Säkerhetskopian sparad");
+  toast(T("Säkerhetskopian sparad", "Backup saved"));
 }
 document.addEventListener("submit", async ev => {
   ev.preventDefault();
@@ -1075,8 +1146,8 @@ document.addEventListener("submit", async ev => {
   if (f.id === "authform") {
     const email = ($("#au-email").value || "").trim(), passEl = $("#au-pass"), pass = passEl ? passEl.value : "";
     state.authEmail = email;
-    if (!email) { state.authMsg = { err: true, text: "Fyll i din e-post." }; return render(true); }
-    if (state.authMode !== "reset" && pass.length < 6) { state.authMsg = { err: true, text: "Lösenordet måste vara minst 6 tecken." }; return render(true); }
+    if (!email) { state.authMsg = { err: true, text: T("Fyll i din e-post.", "Enter your email.") }; return render(true); }
+    if (state.authMode !== "reset" && pass.length < 6) { state.authMsg = { err: true, text: T("Lösenordet måste vara minst 6 tecken.", "The password must be at least 6 characters.") }; return render(true); }
     state.busy = true; state.authMsg = null; render(true);
     try {
       if (state.authMode === "in") {
@@ -1089,24 +1160,24 @@ document.addEventListener("submit", async ev => {
         if (error) throw error;
         state.busy = false;
         if (data.session) return Auth.enter(data.user);
-        state.authMode = "in"; state.authMsg = { text: `Vi har skickat ett mejl till ${email}. Klicka på länken i mejlet för att bekräfta kontot, och logga sedan in här.` };
+        state.authMode = "in"; state.authMsg = { text: T(`Vi har skickat ett mejl till ${email}. Klicka på länken i mejlet för att bekräfta kontot, och logga sedan in här.`, `We sent an email to ${email}. Click the link in it to confirm your account, then log in here.`) };
         return render(true);
       }
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: redirectTo() });
       if (error) throw error;
-      state.busy = false; state.authMode = "in"; state.authMsg = { text: `Om det finns ett konto för ${email} har vi skickat en länk för att välja nytt lösenord.` };
+      state.busy = false; state.authMode = "in"; state.authMsg = { text: T(`Om det finns ett konto för ${email} har vi skickat en länk för att välja nytt lösenord.`, `If there's an account for ${email}, we've sent a link to choose a new password.`) };
       render(true);
     } catch (e) { state.busy = false; state.authMsg = { err: true, text: authErr(e) }; render(true); }
     return;
   }
   if (f.id === "recoverform") {
     const pass = $("#au-new").value || "";
-    if (pass.length < 6) { state.authMsg = { err: true, text: "Lösenordet måste vara minst 6 tecken." }; return render(true); }
+    if (pass.length < 6) { state.authMsg = { err: true, text: T("Lösenordet måste vara minst 6 tecken.", "The password must be at least 6 characters.") }; return render(true); }
     state.busy = true; render(true);
     const { data, error } = await sb.auth.updateUser({ password: pass });
     state.busy = false;
     if (error) { state.authMsg = { err: true, text: authErr(error) }; return render(true); }
-    toast("Lösenordet är bytt"); return Auth.enter(data.user);
+    toast(T("Lösenordet är bytt", "Password changed")); return Auth.enter(data.user);
   }
 });
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
