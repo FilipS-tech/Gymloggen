@@ -244,6 +244,14 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline-color:var(
 .sugg li span:last-child{font-family:var(--display);font-weight:700;font-size:17px;white-space:nowrap;display:flex;gap:6px;align-items:center}
 .sugg li svg{width:14px;height:14px}
 .summary{font-size:16px;line-height:1.5}
+/* technique: video link + tips */
+.xbtn{display:inline-grid;place-items:center;height:28px;min-width:28px;padding:0 8px;border:1px solid var(--line-hi);border-radius:var(--r);color:var(--muted);font-family:var(--body);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;gap:4px;grid-auto-flow:column}
+.xbtn svg{width:14px;height:14px}
+.xbtn:hover,.xbtn[aria-expanded="true"]{border-color:var(--accent);color:var(--accent)}
+.tips{grid-column:2 / -1;margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:15px}
+.tips li::before{content:"";display:inline-block;width:6px;height:6px;background:var(--accent);margin-right:8px;vertical-align:2px}
+.sugg .tipline{display:block;font-size:13px;color:var(--muted);font-family:var(--body);font-weight:400}
+.ex-edit textarea{width:100%;min-height:70px;border:1px solid var(--line-hi);border-radius:var(--r);background:var(--well);color:var(--ink);font:inherit;font-size:15px;padding:8px 10px;resize:vertical}
 /* leave dialog */
 .modal{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:640px;background:var(--surface);border-top:3px solid var(--accent);padding:20px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px}
@@ -323,6 +331,13 @@ const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const DAY_SHORT = ["Sö", "Må", "Ti", "On", "To", "Fr", "Lö"];
 const DAY_LONG = ["söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag"];
 const daysText = p => (p.days || []).length === 7 ? "Varje dag" : DAY_ORDER.filter(d => (p.days || []).includes(d)).map(d => DAY_SHORT[d]).join(" · ");
+const PLAY = S('<path d="M8 5.5v13l10.5-6.5z"/>');
+const videoUrl = n => "https://www.youtube.com/results?search_query=" + encodeURIComponent(n.trim() + " teknik");
+function tipsFor(e) {
+  const p = state.programs.find(q => q.id === (state.active && state.active.programId));
+  const x = p && p.exercises.find(y => y.id === e.exId);
+  return (x && Array.isArray(x.tips)) ? x.tips.filter(Boolean) : [];
+}
 const metric = e => e.type === "bw" ? (e.reps || 0) : (e.value || 0);
 const metricUnit = t => t === "kg" ? "kg" : t === "time" ? "min" : "reps";
 
@@ -568,7 +583,7 @@ function vCoach() {
     return `<div class="screen"><p class="lead">Ditt <em>förslag</em></p>${err}
       ${r.summary ? `<p class="summary">${esc(r.summary)}</p>` : ""}
       ${r.programs.map(p => `<div class="card sugg"><div class="prog-name">${esc(p.name)}</div>${daysText(p) ? `<div class="muted small">${daysText(p)}</div>` : ""}
-        <ul>${p.exercises.map(x => `<li><span>${esc(x.name)}</span><span>${esc(planText(x))}${x.locked ? LOCK : ""}</span></li>`).join("")}</ul></div>`).join("")}
+        <ul>${p.exercises.map(x => `<li><span>${esc(x.name)}${(x.tips || []).length ? `<span class="tipline">${esc(x.tips.join(" · "))}</span>` : ""}</span><span>${esc(planText(x))}${x.locked ? LOCK : ""}</span></li>`).join("")}</ul></div>`).join("")}
       <p class="muted small">Tomma vikter fyller du i första gången du kör passet.</p>
       <button class="btn primary wide" data-act="coachSave">Spara ${r.programs.length === 1 ? "passet" : "passen"}</button>
       ${c.showFeedback ? `<div class="form"><div class="field"><label for="c-feedback">Vad vill du ändra?</label><textarea id="c-feedback" data-c="feedback" placeholder="T.ex. byt marklyft mot något skonsammare för ryggen">${esc(c.feedback)}</textarea></div>
@@ -638,10 +653,14 @@ function vActive() {
   const rows = a.entries.map((e, i) => {
     const prev = lastFor(e.exId, e.name);
     const prevTxt = prev ? `Förra: <b class="num">${esc(fmtEntry(prev.e))}</b> · ${dShort(prev.date)}` : "Första gången";
+    const tips = tipsFor(e), open = state.tipsOpen && state.tipsOpen.has(i);
     const head = `<div class="fig">${ICONS[e.icon] || ICONS.gen}</div>
-      <div class="name">${esc(e.name)}${e.locked ? ` <span class="chip lock">Låst</span>` : ""}</div>
+      <div class="name">${esc(e.name)}${e.locked ? ` <span class="chip lock">Låst</span>` : ""}
+        <a class="xbtn" href="${videoUrl(e.name)}" target="_blank" rel="noopener" aria-label="Se video: ${esc(e.name)}">${PLAY}Video</a>
+        ${tips.length ? `<button class="xbtn" data-act="tips" data-i="${i}" aria-expanded="${open}">Tips</button>` : ""}</div>
       <div class="prev">${e.locked ? "Samma varje pass" : prevTxt}</div>`;
-    if (e.locked) return `<div class="row">${head}<div class="fixed">Idag: <b class="num">${esc(fmtEntry(e))}</b></div></div>`;
+    const tipList = open && tips.length ? `<ul class="tips">${tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : "";
+    if (e.locked) return `<div class="row">${head}<div class="fixed">Idag: <b class="num">${esc(fmtEntry(e))}</b></div>${tipList}</div>`;
     const ph = prev ? prev.e : (e.plan || {});
     const f = (key, label, mode, placeholder) => `<div class="field box"><label for="a-${i}-${key}">${label}</label>
       <input id="a-${i}-${key}" inputmode="${mode}" data-a="${i}" data-f="${key}" value="${esc(e[key] ?? "")}" placeholder="${placeholder ?? ""}"></div>`;
@@ -650,7 +669,7 @@ function vActive() {
     if (e.type === "time") inputs.push(f("value", "Min", "decimal", ph.value != null ? fmtNum(ph.value) : ""));
     if (e.type !== "time") inputs.push(f("reps", "Reps", "numeric", ph.reps ?? ""));
     inputs.push(f("sets", "Set", "numeric", ph.sets ?? ""));
-    return `<div class="row">${head}<div class="inputs">${inputs.join("")}</div></div>`;
+    return `<div class="row">${head}<div class="inputs">${inputs.join("")}</div>${tipList}</div>`;
   }).join("");
   const c = state.confirm === "cancel";
   return `<section class="section">
@@ -711,6 +730,8 @@ function vEditor() {
         <div class="field"><label for="e-${i}-icon">Figur</label><select id="e-${i}-icon" data-e="${i}" data-f="icon">${iconOpts}</select></div>
       </div>
       ${fixed}
+      <div class="field"><label for="e-${i}-tips">Teknikpunkter <span class="opt">(valfritt, en per rad)</span></label>
+        <textarea id="e-${i}-tips" data-e="${i}" data-f="tipsText" placeholder="T.ex. Rak rygg">${esc(x.tipsText ?? (x.tips || []).join("\n"))}</textarea></div>
       <button class="btn sm" data-act="closeEx" data-i="${i}" style="align-self:flex-start">Klar</button>
     </div>`;
   }).join("");
@@ -846,7 +867,7 @@ function chart(points, unit) {
 let pending = false;
 function render(force) {
   const a = document.activeElement;
-  if (!force && a && main.contains(a) && /INPUT|SELECT/.test(a.tagName)) { pending = true; return; }
+  if (!force && a && main.contains(a) && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) { pending = true; return; }
   pending = false;
   if (state.screen !== "app") {
     $("#title").textContent = "Gymloggen"; $("#burger").hidden = true; $("#menu").hidden = true; state.menu = false;
@@ -862,7 +883,7 @@ function render(force) {
   renderModal();
   main.innerHTML = state.view === "trana" ? vTrain() : state.view === "program" ? vPrograms() : state.view === "historik" ? vHistory() : vProgress();
 }
-main.addEventListener("focusout", () => { if (pending) setTimeout(() => { const a = document.activeElement; if (!(a && main.contains(a) && /INPUT|SELECT/.test(a.tagName))) render(true); }, 0); });
+main.addEventListener("focusout", () => { if (pending) setTimeout(() => { const a = document.activeElement; if (!(a && main.contains(a) && /INPUT|SELECT|TEXTAREA/.test(a.tagName))) render(true); }, 0); });
 
 const dirty = () => !!state.editing && JSON.stringify(state.editing) !== state.editOrig;
 function renderModal() {
@@ -892,7 +913,7 @@ function saveProgram() {
   E.name = E.name.trim(); E.exercises = E.exercises.filter(x => x.name.trim());
   if (!E.name) { toast("Ge programmet ett namn först."); return false; }
   if (!E.exercises.length) { toast("Lägg till minst en övning med namn."); return false; }
-  E.exercises.forEach(x => { x.name = x.name.trim(); x.locked = !!x.locked; x.value = x.type === "bw" ? null : num(x.value); x.reps = x.type === "time" ? 1 : (num(x.reps) || 1); x.sets = num(x.sets) || 1; });
+  E.exercises.forEach(x => { if (x.tipsText != null) { x.tips = x.tipsText.split("\n").map(t => t.trim()).filter(Boolean).slice(0, 4); delete x.tipsText; } x.name = x.name.trim(); x.locked = !!x.locked; x.value = x.type === "bw" ? null : num(x.value); x.reps = x.type === "time" ? 1 : (num(x.reps) || 1); x.sets = num(x.sets) || 1; });
   const list = state.programs.slice(); const at = list.findIndex(p => p.id === E.id);
   at >= 0 ? list[at] = E : list.push(E);
   Store.savePrograms(list); state.editing = null; toast("Programmet sparat"); return true;
@@ -932,7 +953,7 @@ document.addEventListener("click", ev => {
         entries: p.exercises.map(x => x.locked ? { exId: x.id, name: x.name, type: x.type, icon: x.icon, locked: true, value: x.value ?? null, reps: x.reps || 1, sets: x.sets || 1 }
           : { exId: x.id, name: x.name, type: x.type, icon: x.icon, locked: false, value: "", reps: "", sets: "",
               plan: { value: x.value ?? null, reps: x.reps > 1 ? x.reps : null, sets: x.sets > 1 ? x.sets : null } }) };
-      saveDraft(); break;
+      state.tipsOpen = new Set(); saveDraft(); break;
     }
     case "finish": {
       const a = state.active; const entries = [];
@@ -958,6 +979,7 @@ document.addEventListener("click", ev => {
     case "importNo": state.pendingImport = null; break;
     case "importYes": { const d = state.pendingImport; state.pendingImport = null; Store.writeLocal(d); state.programs = d.programs; state.sessions = sortS(d.sessions); toast("Data importerad"); break; }
     case "menu": state.menu = !state.menu; break;
+    case "tips": { state.tipsOpen = state.tipsOpen || new Set(); state.tipsOpen.has(i) ? state.tipsOpen.delete(i) : state.tipsOpen.add(i); break; }
     case "reload": location.reload(); return;
     case "authMode": state.authMode = b.dataset.v; state.authMsg = null; { const e = $("#au-email"); if (e) state.authEmail = e.value; } break;
     case "google": {
@@ -1014,7 +1036,7 @@ document.addEventListener("input", ev => {
   const t = ev.target;
   if (t.dataset.c && state.coach) { if (t.dataset.c === "feedback") state.coach.feedback = t.value; else state.coach.answers[t.dataset.c] = t.value; return; }
   if (t.dataset.a != null) { state.active.entries[+t.dataset.a][t.dataset.f] = t.value; saveDraft(); }
-  else if (t.dataset.e != null && t.tagName === "INPUT") state.editing.exercises[+t.dataset.e][t.dataset.f] = t.value;
+  else if (t.dataset.e != null && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) state.editing.exercises[+t.dataset.e][t.dataset.f] = t.value;
   else if (t.dataset.p) state.editing[t.dataset.p] = t.value;
 });
 document.addEventListener("change", ev => {

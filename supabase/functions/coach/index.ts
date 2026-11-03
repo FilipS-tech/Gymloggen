@@ -46,8 +46,9 @@ const TOOL = {
                   value: { type: ["number", "null"], description: "Kilo (type kg) eller minuter (type time). null för kg om startvikten är okänd. null för bw." },
                   reps: { type: "integer", minimum: 1, maximum: 50, description: "Reps per set. 1 för type time." },
                   sets: { type: "integer", minimum: 1, maximum: 10 },
+                  tips: { type: "array", maxItems: 3, items: { type: "string" }, description: "2–3 korta teknikpunkter på svenska, max ca 6 ord var, t.ex. 'Knäna i linje med tårna'." },
                 },
-                required: ["name", "type", "icon", "locked", "value", "reps", "sets"],
+                required: ["name", "type", "icon", "locked", "value", "reps", "sets", "tips"],
               },
             },
           },
@@ -74,6 +75,7 @@ Regler för passen:
 - Nybörjare: få, grundläggande övningar, 3 set, 8–12 reps. Vana: mer volym och variation.
 - Startvikter: sätt value till null för kg-övningar om användaren inte angett kända lyft. Har hen angett kända lyft, föreslå en försiktig startvikt runt 70–80 % av arbetsvikten, avrundad till 2,5 kg.
 - Kroppsviktsövningar: type bw, value null.
+- Ge varje övning 2–3 korta, konkreta teknikpunkter (tips) som hjälper användaren att utföra den säkert. För uppvärmning räcker 1 punkt.
 - Skriv allt på svenska. Inga medicinska råd; vid skada, föreslå att hen kollar med vårdpersonal i summary.
 Svara alltid i det angivna JSON-formatet.`;
 
@@ -92,6 +94,7 @@ function clean(input: any) {
         value: type === "bw" || !isFinite(v) || x?.value === null ? null : Math.round(v * 4) / 4,
         reps: type === "time" ? 1 : Math.min(50, Math.max(1, Math.round(Number(x?.reps) || 1))),
         sets: Math.min(10, Math.max(1, Math.round(Number(x?.sets) || 1))),
+        tips: (Array.isArray(x?.tips) ? x.tips : []).map((t: unknown) => String(t ?? "").trim().slice(0, 80)).filter(Boolean).slice(0, 3),
       };
     }),
   })).filter((p: any) => p.exercises.length);
@@ -113,7 +116,7 @@ function simpleSchema(node: any): any {
   }
   return out;
 }
-const FORMAT_HINT = `\nSvara ENDAST med ett JSON-objekt med fälten: relevant (boolean), message (string), summary (string), programs (array av {name, days: heltal 0-6, exercises: array av {name, type: "kg"|"time"|"bw", icon: ${ICONS.join("|")}, locked (boolean), value (tal eller null), reps (heltal), sets (heltal)}}).`;
+const FORMAT_HINT = `\nSvara ENDAST med ett JSON-objekt med fälten: relevant (boolean), message (string), summary (string), programs (array av {name, days: heltal 0-6, exercises: array av {name, type: "kg"|"time"|"bw", icon: ${ICONS.join("|")}, locked (boolean), value (tal eller null), reps (heltal), sets (heltal), tips (array med 2–3 korta teknikpunkter)}}).`;
 
 async function askGemini(key: string, msg: string) {
   const base = {
