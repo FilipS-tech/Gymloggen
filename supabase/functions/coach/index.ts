@@ -2,7 +2,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const CLAUDE_MODEL = "claude-sonnet-5-5";
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
+const GEMINI_MODELS = (Deno.env.get("GEMINI_MODELS") || "gemini-3.8-flash,gemini-3.6-flash,gemini-3.5-flash-lite").split(",").map((m) => m.trim()).filter(Boolean);
 const DAILY_LIMIT = 5;
 
 const CORS = {
@@ -102,7 +102,6 @@ const DAYS = ["söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "l�
 const s = (v: unknown, n = 400) => String(v ?? "").trim().slice(0, n);
 
 async function askGemini(key: string, msg: string) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
   const base = {
     systemInstruction: { parts: [{ text: SYSTEM }] },
     contents: [{ role: "user", parts: [{ text: msg }] }],
@@ -111,18 +110,33 @@ async function askGemini(key: string, msg: string) {
     { generationConfig: { temperature: 0.6, responseFormat: { text: { mimeType: "APPLICATION_JSON", schema: TOOL.input_schema } } } },
     { generationConfig: { temperature: 0.6, responseMimeType: "application/json", responseJsonSchema: TOOL.input_schema } },
   ];
-  let last = "";
-  for (const shape of shapes) {
-    const r = await fetch(url, { method: "POST", headers: { "x-goog-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ ...base, ...shape }) });
-    if (r.ok) {
-      const out = await r.json();
-      const text = (out?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("");
-      return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+  const errors: string[] = [];
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    for (const shape of shapes) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 40000);
+      let r: Response | null = null;
+      try {
+        r = await fetch(url, { method: "POST", signal: ctrl.signal, headers: { "x-goog-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ ...base, ...shape }) });
+      } catch (e) {
+        errors.push(`${model} ${String(e)}`);
+        break; // timeout or network: try next model
+      } finally { clearTimeout(timer); }
+      if (!r) break;
+      if (r.ok) {
+        const out = await r.json();
+        const text = (out?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("");
+        try { return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, "")); }
+        catch { errors.push(`${model} bad json`); break; }
+      }
+      const body = (await r.text()).slice(0, 300);
+      errors.push(`${model} ${r.status} ${body}`);
+      if (r.status === 401 || r.status === 403) throw new Error("gemini key " + errors.join(" | "));
+      if (r.status !== 400) break; // 429/500/503: next model
     }
-    last = `${r.status} ${await r.text()}`;
-    if (r.status !== 400) break;
   }
-  throw new Error("gemini " + last.slice(0, 500));
+  throw new Error("gemini " + errors.join(" | ").slice(0, 1500));
 }
 
 async function askClaude(key: string, msg: string) {
@@ -177,17 +191,20 @@ Kända lyft: ${s(a.lifts) || "Inga angivna"}`;
     msg += `\n\nDitt förra förslag var:\n${JSON.stringify(clean(body.previous)).slice(0, 6000)}\n\nAnvändarens ändringsönskemål: ${s(body.feedback, 600)}\nGör ett nytt förslag som tar hänsyn till det.`;
   }
 
-  await admin.from("coach_usage").insert({ user_id: uid });
+  const { data: usage } = await admin.from("coach_usage").insert({ user_id: uid }).select("id").single();
+  const refund = async () => { if (usage?.id) await admin.from("coach_usage").delete().eq("id", usage.id); };
 
   let raw: any = null;
   try {
     raw = geminiKey ? await askGemini(geminiKey, msg) : await askClaude(claudeKey!, msg);
   } catch (e) {
     console.error("ai", String(e));
-    return json({ error: "Coachen svarade inte. Försök igen om en stund." }, 502);
+    await refund();
+    const busy = /\b(429|500|503)\b|abort/i.test(String(e));
+    return json({ error: busy ? "Coachen har mycket att göra just nu. Vänta en minut och försök igen." : "Coachen svarade inte. Försök igen om en stund." }, 502);
   }
   const result = clean(raw);
   if (!result.relevant) return json({ error: result.message || "Jag hjälper bara till med träningspass. Beskriv ditt träningsmål så bygger jag ett förslag.", code: "offtopic" }, 422);
-  if (!result.programs.length) return json({ error: "Coachen kunde inte göra ett förslag. Försök beskriva målet lite tydligare." }, 502);
+  if (!result.programs.length) { await refund(); return json({ error: "Coachen kunde inte göra ett förslag. Försök beskriva målet lite tydligare." }, 502); }
   return json({ ...result, remaining: Math.max(0, DAILY_LIMIT - (count ?? 0) - 1) });
 });
