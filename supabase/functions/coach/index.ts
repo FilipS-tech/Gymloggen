@@ -101,14 +101,30 @@ function clean(input: any) {
 const DAYS = ["söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag"];
 const s = (v: unknown, n = 400) => String(v ?? "").trim().slice(0, n);
 
+// A simpler OpenAPI-style schema for models that reject the full JSON Schema.
+function simpleSchema(node: any): any {
+  if (Array.isArray(node)) return node.map(simpleSchema);
+  if (!node || typeof node !== "object") return node;
+  const out: any = {};
+  for (const [k, v] of Object.entries(node)) {
+    if (["minimum", "maximum", "minItems", "maxItems", "additionalProperties"].includes(k)) continue;
+    if (k === "type" && Array.isArray(v)) { out.type = (v as string[]).find((t) => t !== "null") ?? "string"; out.nullable = true; continue; }
+    out[k] = k === "properties" ? Object.fromEntries(Object.entries(v as any).map(([pk, pv]) => [pk, simpleSchema(pv)])) : simpleSchema(v);
+  }
+  return out;
+}
+const FORMAT_HINT = `\nSvara ENDAST med ett JSON-objekt med fälten: relevant (boolean), message (string), summary (string), programs (array av {name, days: heltal 0-6, exercises: array av {name, type: "kg"|"time"|"bw", icon: ${ICONS.join("|")}, locked (boolean), value (tal eller null), reps (heltal), sets (heltal)}}).`;
+
 async function askGemini(key: string, msg: string) {
   const base = {
     systemInstruction: { parts: [{ text: SYSTEM }] },
     contents: [{ role: "user", parts: [{ text: msg }] }],
   };
-  const shapes = [
-    { generationConfig: { temperature: 0.6, responseFormat: { text: { mimeType: "APPLICATION_JSON", schema: TOOL.input_schema } } } },
+  const shapes: any[] = [
     { generationConfig: { temperature: 0.6, responseMimeType: "application/json", responseJsonSchema: TOOL.input_schema } },
+    { generationConfig: { temperature: 0.6, responseMimeType: "application/json", responseSchema: simpleSchema(TOOL.input_schema) } },
+    { generationConfig: { temperature: 0.6, responseMimeType: "application/json" }, hint: true },
+    { plain: true },
   ];
   const errors: string[] = [];
   for (const model of GEMINI_MODELS) {
@@ -118,7 +134,11 @@ async function askGemini(key: string, msg: string) {
       const timer = setTimeout(() => ctrl.abort(), 40000);
       let r: Response | null = null;
       try {
-        r = await fetch(url, { method: "POST", signal: ctrl.signal, headers: { "x-goog-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ ...base, ...shape }) });
+        r = await fetch(url, { method: "POST", signal: ctrl.signal, headers: { "x-goog-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify(shape.plain
+          ? { contents: [{ role: "user", parts: [{ text: SYSTEM + FORMAT_HINT + "\n\n" + msg }] }] }
+          : shape.hint
+          ? { systemInstruction: { parts: [{ text: SYSTEM + FORMAT_HINT }] }, contents: base.contents, generationConfig: shape.generationConfig }
+          : { ...base, generationConfig: shape.generationConfig }) });
       } catch (e) {
         errors.push(`${model} ${String(e)}`);
         break; // timeout or network: try next model
@@ -127,7 +147,9 @@ async function askGemini(key: string, msg: string) {
       if (r.ok) {
         const out = await r.json();
         const text = (out?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("");
-        try { return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, "")); }
+        console.log("ai ok", model, shapes.indexOf(shape));
+        const m = text.match(/\{[\s\S]*\}/);
+        try { return JSON.parse(m ? m[0] : text); }
         catch { errors.push(`${model} bad json`); break; }
       }
       const body = (await r.text()).slice(0, 300);
